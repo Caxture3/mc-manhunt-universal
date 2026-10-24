@@ -1,0 +1,21 @@
+[versions]
+loom = "1.18.4"
+fabric-loader = "0.19.5"
+minecraft12111 = "1.21.11"
+minecraft263 = "26.3"
+paper12111 = "1.21.11-R0.1-SNAPSHOT"
+paper263 = "26.3.build.200-stable"
+fabric-api12111 = "0.141.6+1.21.11"
+fabric-api263 = "0.163.0+26.3"
+
+[libraries]
+paper12111 = { module = "io.papermc.paper:paper-api", version.ref = "paper12111" }
+paper263 = { module = "io.papermc.paper:paper-api", version.ref = "paper263" }
+fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
+fabric-api12111 = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api12111" }
+fabric-api263 = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api263" }
+
+[plugins]
+loom = { id = "net.fabricmc.fabric-loom", version.ref = "loom" }
+loom-remap = { id = "net.fabricmc.fabric-loom-remap", version.ref = "loom" }
+

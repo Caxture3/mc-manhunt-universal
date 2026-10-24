@@ -1,0 +1,6 @@
+name: ManhuntUniversal
+version: '${version}'
+main: com.caxture.manhunt.paper.ManhuntPlugin
+api-version: '${minecraft_version}'
+description: Multi-version manhunt plugin skeleton.
+
