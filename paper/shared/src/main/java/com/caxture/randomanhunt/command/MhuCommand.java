@@ -5,6 +5,8 @@ import com.caxture.randomanhunt.config.ConfigurationService;
 import com.caxture.randomanhunt.config.IntConfigKey;
 import com.caxture.randomanhunt.game.GameManager;
 import com.caxture.randomanhunt.game.GameSession;
+import com.caxture.randomanhunt.game.TeamPreference;
+import com.caxture.randomanhunt.game.TeamSelectionService;
 import com.caxture.randomanhunt.i18n.LanguageService;
 import com.caxture.randomanhunt.presentation.MatchPresentation;
 import com.caxture.randomanhunt.runtime.ActiveGameCoordinator;
@@ -13,8 +15,13 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.ClickCallback;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,7 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public final class RmhCommand implements CommandExecutor, TabCompleter {
+public final class MhuCommand implements CommandExecutor, TabCompleter {
     public static final String ADMIN_PERMISSION = "randomanhunt.admin";
 
     private final GameManager gameManager;
@@ -32,14 +39,16 @@ public final class RmhCommand implements CommandExecutor, TabCompleter {
     private final LanguageService language;
     private final MatchPresentation presentation;
     private final Clock clock;
+    private final TeamSelectionPresenter teamPresenter;
 
-    public RmhCommand(
+    public MhuCommand(
             GameManager gameManager,
             GameStartCoordinator gameStart,
             ActiveGameCoordinator activeGame,
             ConfigurationService configuration,
             LanguageService language,
             MatchPresentation presentation,
+            TeamSelectionPresenter teamPresenter,
             Clock clock
     ) {
         this.gameManager = gameManager;
@@ -49,10 +58,15 @@ public final class RmhCommand implements CommandExecutor, TabCompleter {
         this.language = language;
         this.presentation = presentation;
         this.clock = clock;
+        this.teamPresenter = teamPresenter;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length > 0 && args[0].equalsIgnoreCase("join")) {
+            join(sender, args);
+            return true;
+        }
         if (!CommandAccessPolicy.adminAllowed(sender.hasPermission(ADMIN_PERMISSION))) {
             language.send(sender, "command.no-permission");
             return true;
@@ -69,6 +83,34 @@ public final class RmhCommand implements CommandExecutor, TabCompleter {
             default -> language.send(sender, "command.unknown");
         }
         return true;
+    }
+
+    private void join(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            language.send(sender, "team.player-only");
+            return;
+        }
+        if (args.length == 1) {
+            teamPresenter.show(player);
+            return;
+        }
+        TeamPreference preference;
+        try {
+            if (args.length != 2) throw new IllegalArgumentException();
+            preference = TeamPreference.valueOf(args[1].toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            language.send(player, "team.usage");
+            return;
+        }
+        TeamSelectionService.ChoiceResult result = gameManager.teamSelections().choose(
+                player.getUniqueId(), preference, configuration.get(IntConfigKey.RUNNER_COUNT));
+        switch (result) {
+            case FULL -> language.send(player, "team.runner-full", Map.of(
+                    "count", Integer.toString(configuration.get(IntConfigKey.RUNNER_COUNT))));
+            case LOCKED -> language.send(player, "team.locked");
+            case CHANGED, UNCHANGED -> language.send(player, "team.selected", Map.of(
+                    "team", language.text(player, "team.name." + preference.name().toLowerCase(Locale.ROOT))));
+        }
     }
 
     private void start(CommandSender sender, String[] args) {
@@ -141,15 +183,20 @@ public final class RmhCommand implements CommandExecutor, TabCompleter {
             language.send(sender, "config.usage");
             return;
         }
+        saveConfig(sender, requested, integerKey, booleanKey, args[2]);
+    }
+
+    private boolean saveConfig(CommandSender sender, String requested, IntConfigKey integerKey,
+                               BooleanConfigKey booleanKey, String raw) {
         try {
             boolean saved;
             String value;
             if (integerKey != null) {
-                int parsed = CommandArguments.integer(integerKey, args[2]);
+                int parsed = CommandArguments.integer(integerKey, raw);
                 saved = configuration.update(integerKey, parsed);
                 value = Integer.toString(parsed);
             } else {
-                boolean parsed = CommandArguments.bool(args[2]);
+                boolean parsed = CommandArguments.bool(raw);
                 saved = configuration.update(booleanKey, parsed);
                 value = Boolean.toString(parsed);
             }
@@ -157,14 +204,17 @@ public final class RmhCommand implements CommandExecutor, TabCompleter {
                 if (booleanKey != null) {
                     activeGame.configurationChanged(booleanKey);
                 }
-                language.send(sender, "config.saved", Map.of("key", requested, "value", value));
+                language.send(sender, "config.saved", Map.of(
+                        "key", language.text(sender, "config.name." + requested), "value", value));
             } else {
                 language.send(sender, "config.save-failed");
             }
+            return saved;
         } catch (CommandArguments.InvalidArgument exception) {
             language.send(sender, "config.invalid", Map.of(
                     "reason", argumentError(sender, exception.error(), integerKey)));
         }
+        return false;
     }
 
     private String argumentError(
@@ -182,7 +232,29 @@ public final class RmhCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendConfigEntry(CommandSender sender, String key, String value) {
-        language.send(sender, "config.entry", Map.of("key", key, "value", value));
+        Component line = language.chatComponent(sender, "config.entry", Map.of(
+                "key", language.text(sender, "config.name." + key), "value", value));
+        ClickEvent click = null;
+        if (sender instanceof Player owner) {
+            var ownerId = owner.getUniqueId();
+            BooleanConfigKey booleanKey = BooleanConfigKey.find(key).orElse(null);
+            click = booleanKey == null ? ClickEvent.suggestCommand("/mhu config " + key + " ")
+                    : ClickEvent.callback(audience -> {
+                        if (!(audience instanceof Player player)
+                                || !ownerId.equals(player.getUniqueId())) return;
+                        ConfigToggleAction.Result result = ConfigToggleAction.toggle(
+                                () -> player.hasPermission(ADMIN_PERMISSION),
+                                () -> configuration.get(booleanKey),
+                                next -> saveConfig(player, key, null, booleanKey, Boolean.toString(next)));
+                        if (result == ConfigToggleAction.Result.DENIED) {
+                            language.send(player, "command.no-permission");
+                        } else if (result == ConfigToggleAction.Result.CHANGED) {
+                            sendConfigEntry(player, key, Boolean.toString(configuration.get(booleanKey)));
+                        }
+                    }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES)
+                            .lifetime(Duration.ofHours(1)).build());
+        }
+        sender.sendMessage(InteractiveMessages.configEntry(line, key, click));
     }
 
     @Override
@@ -192,12 +264,15 @@ public final class RmhCommand implements CommandExecutor, TabCompleter {
             String alias,
             String[] args
     ) {
-        if (!CommandAccessPolicy.adminAllowed(sender.hasPermission(ADMIN_PERMISSION))) {
-            return List.of();
-        }
+        boolean admin = CommandAccessPolicy.adminAllowed(sender.hasPermission(ADMIN_PERMISSION));
         List<String> candidates = new ArrayList<>();
         if (args.length == 1) {
-            candidates.addAll(List.of("start", "status", "stop", "config"));
+            if (sender instanceof Player) candidates.add("join");
+            if (admin) candidates.addAll(List.of("start", "status", "stop", "config"));
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("join") && sender instanceof Player) {
+            candidates.addAll(List.of("hunter", "runner", "random"));
+        } else if (!admin) {
+            return List.of();
         } else if (args.length == 2 && args[0].equalsIgnoreCase("start")) {
             candidates.addAll(List.of("5", "10", "30", "60"));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("config")) {

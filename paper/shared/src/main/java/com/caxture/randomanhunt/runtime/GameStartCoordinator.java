@@ -87,6 +87,16 @@ public final class GameStartCoordinator {
                     "count", Integer.toString(values.get(IntConfigKey.RUNNER_COUNT) + 1)));
             return false;
         }
+        if (result.status() == StartStatus.NOT_ENOUGH_RANDOM_PLAYERS) {
+            language.send(sender, "game.start.not-enough-random", Map.of(
+                    "count", Integer.toString(result.missingRunners())));
+            return false;
+        }
+        if (result.status() == StartStatus.RUNNER_SELECTION_LIMIT_EXCEEDED) {
+            language.send(sender, "team.runner-full", Map.of(
+                    "count", Integer.toString(values.get(IntConfigKey.RUNNER_COUNT))));
+            return false;
+        }
         GameSession session = result.session().orElseThrow();
         if (countdownSeconds == 0) {
             activate(session, sender);

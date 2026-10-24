@@ -14,6 +14,7 @@ import com.caxture.randomanhunt.game.TrackingSettingsSnapshot;
 import com.caxture.randomanhunt.player.CountdownBlindnessService;
 import com.caxture.randomanhunt.player.PendingPlayerState;
 import com.caxture.randomanhunt.player.PlayerResetService;
+import com.caxture.randomanhunt.player.RunnerSpectatorService;
 import com.caxture.randomanhunt.presentation.IdentityDisplayService;
 import com.caxture.randomanhunt.presentation.MatchPresentation;
 import com.caxture.randomanhunt.tracking.CompassTrackingService;
@@ -48,6 +49,7 @@ public final class ActiveGameCoordinator {
     private BukkitTask countdownTask;
     private BukkitTask dragonPresenceTask;
     private final PendingResetRetrier pendingResetRetrier;
+    private final RunnerSpectatorService spectators;
     private UUID countdownSessionId;
     private int countdownRemaining;
 
@@ -74,6 +76,8 @@ public final class ActiveGameCoordinator {
         this.presentation = presentation;
         this.tracking = tracking;
         this.clock = clock;
+        this.spectators = new RunnerSpectatorService(server, gameManager,
+                action -> server.getScheduler().runTask(plugin, action));
         this.pendingResetRetrier = new PendingResetRetrier(action -> {
             BukkitTask task = server.getScheduler().runTaskTimer(plugin, action, 1L, 20L);
             return task::cancel;
@@ -148,6 +152,8 @@ public final class ActiveGameCoordinator {
         cancelAllTasks();
         blindness.restoreAllOnline();
         tracking.shutdown();
+        spectators.restoreAllOnline();
+        gameManager.teamSelections().clear();
     }
 
     public void abortStart(UUID expectedSessionId) {
@@ -156,12 +162,21 @@ public final class ActiveGameCoordinator {
 
     public void playerDied(Player player) {
         GameSession session = runningSession().orElse(null);
-        if (session == null) {
+        if (session == null || !session.isRunnerAlive(player.getUniqueId())) {
             return;
         }
         Optional<UUID> killer = Optional.ofNullable(player.getKiller()).map(Player::getUniqueId);
-        gameManager.recordRunnerDeath(
-                session.id(), player.getUniqueId(), killer, Instant.now(clock)).ifPresent(this::finish);
+        Optional<GameResult> result = gameManager.recordRunnerDeath(
+                session.id(), player.getUniqueId(), killer, Instant.now(clock));
+        pendingResetRetrier.cancel(player.getUniqueId());
+        pendingPlayers.completeReset(player.getUniqueId());
+        spectators.eliminated(session, player);
+        tracking.runnerEliminated(player);
+        result.ifPresent(this::finish);
+    }
+
+    public void playerRespawned(Player player) {
+        spectators.respawned(player);
     }
 
     public void playerChangedWorld(Player player) {
@@ -186,6 +201,7 @@ public final class ActiveGameCoordinator {
 
     public void playerJoined(Player player) {
         identity.restorePending(player);
+        spectators.joined(player);
         tracking.cleanupStale(player);
         GameSession session = gameManager.activeSession().orElse(null);
         if (session == null) {
@@ -205,6 +221,11 @@ public final class ActiveGameCoordinator {
             blindness.restore(player);
             return;
         }
+        if (session.isEliminatedRunner(player.getUniqueId())) {
+            blindness.restore(player);
+            identity.applyJoiningPlayer(session, player);
+            return;
+        }
         if (pendingPlayers.needsReset(player.getUniqueId())) {
             if (!tryCompletePendingReset(session, player)) {
                 schedulePendingResetRetry(session.id(), player.getUniqueId());
@@ -217,6 +238,7 @@ public final class ActiveGameCoordinator {
     }
 
     public void playerQuit(Player player) {
+        gameManager.teamSelections().remove(player.getUniqueId());
         pendingResetRetrier.cancel(player.getUniqueId());
         tracking.playerQuit(player);
         // UUID-backed reset and restoration debt intentionally survives the disconnect.
@@ -328,9 +350,13 @@ public final class ActiveGameCoordinator {
             try {
                 identity.clear(session);
             } finally {
-                session.participants().forEach(
-                        participant -> pendingPlayers.completeReset(participant.id()));
-                gameManager.clearSettled(session.id());
+                try {
+                    spectators.finish(session.id());
+                } finally {
+                    session.participants().forEach(
+                            participant -> pendingPlayers.completeReset(participant.id()));
+                    gameManager.clearSettled(session.id());
+                }
             }
         }
     }

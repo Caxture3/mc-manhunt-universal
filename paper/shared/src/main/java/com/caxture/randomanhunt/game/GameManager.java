@@ -10,6 +10,7 @@ import java.util.UUID;
 public final class GameManager {
     private final RoleAssigner roleAssigner;
     private GameSession activeSession;
+    private final TeamSelectionService teamSelections = new TeamSelectionService(() -> activeSession != null);
 
     public GameManager(RoleAssigner roleAssigner) {
         this.roleAssigner = roleAssigner;
@@ -30,7 +31,18 @@ public final class GameManager {
             return StartResult.rejected(StartStatus.NOT_ENOUGH_PLAYERS);
         }
         List<UUID> ids = participants.stream().map(Participant::id).toList();
-        List<UUID> runners = roleAssigner.select(ids, settings.runnerCount());
+        Map<UUID, TeamPreference> preferences = teamSelections.snapshot();
+        long selectedRunners = ids.stream().filter(id -> preferences.get(id) == TeamPreference.RUNNER).count();
+        if (selectedRunners > settings.runnerCount()) {
+            return StartResult.rejected(StartStatus.RUNNER_SELECTION_LIMIT_EXCEEDED);
+        }
+        long randomPlayers = ids.stream().filter(id ->
+                preferences.getOrDefault(id, TeamPreference.RANDOM) == TeamPreference.RANDOM).count();
+        int missing = settings.runnerCount() - (int) selectedRunners - (int) randomPlayers;
+        if (missing > 0) {
+            return StartResult.missingRandomPlayers(missing);
+        }
+        List<UUID> runners = roleAssigner.select(ids, settings.runnerCount(), preferences);
         activeSession = new GameSession(
                 UUID.randomUUID(), createdAt, participants, settings, runners);
         return StartResult.started(activeSession);
@@ -38,6 +50,10 @@ public final class GameManager {
 
     public synchronized Optional<GameSession> activeSession() {
         return Optional.ofNullable(activeSession);
+    }
+
+    public TeamSelectionService teamSelections() {
+        return teamSelections;
     }
 
     public synchronized Optional<GameSession> activate(UUID expectedSessionId, Instant at) {
@@ -66,7 +82,7 @@ public final class GameManager {
             UUID worldId
     ) {
         return isRunning(expectedSessionId)
-                && activeSession.roleOf(playerId).orElse(null) == Role.RUNNER
+                && activeSession.isRunnerAlive(playerId)
                 && activeSession.bindTargetEnd(worldId);
     }
 
@@ -76,8 +92,10 @@ public final class GameManager {
             Optional<UUID> killer,
             Instant at
     ) {
-        if (!isRunning(expectedSessionId)
-                || activeSession.roleOf(playerId).orElse(null) != Role.RUNNER) {
+        if (!isRunning(expectedSessionId) || !activeSession.eliminateRunner(playerId)) {
+            return Optional.empty();
+        }
+        if (!activeSession.livingRunnerIds().isEmpty()) {
             return Optional.empty();
         }
         return settle(
@@ -136,6 +154,7 @@ public final class GameManager {
         }
         GameSession cleared = activeSession;
         activeSession = null;
+        teamSelections.clear();
         return Optional.of(cleared);
     }
 

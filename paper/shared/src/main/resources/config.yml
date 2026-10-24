@@ -3,6 +3,7 @@ runner-compass-enabled: true
 hunter-compass-enabled: true
 reset-players-at-start: true
 show-chat-prefix: true
+allow-blaze-spawner-break: false
 tracking-retarget-distance-blocks: 512
 tracking-retarget-cooldown-seconds: 30
 tracking-search-radius-blocks: 4096

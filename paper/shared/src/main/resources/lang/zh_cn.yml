@@ -1,25 +1,27 @@
-prefix: "§8[§c随机追杀§8] §r"
+prefix: "§8[§c穹猎追杀§8] §r"
 identity:
   runner: "§c速通者"
   hunter: "§b猎人"
 command:
   no-permission: "{prefix}§c你没有权限执行该指令。"
-  usage: "{prefix}§e用法：/rmh <start [1-60秒]|status|stop|config>"
+  usage: "{prefix}§e用法：/mhu <join [hunter|runner|random]|start [1-60秒]|status|stop|config>"
   unknown: "{prefix}§c未知的子指令。"
 game:
   start:
-    usage: "{prefix}§e用法：/rmh start [1-60秒]"
+    usage: "{prefix}§e用法：/mhu start [1-60秒]"
     countdown-not-integer: "{prefix}§c倒计时秒数必须是整数。"
     countdown-out-of-range: "{prefix}§c倒计时秒数必须在 1 到 60 之间。"
     already-running: "{prefix}§c已有一局游戏正在进行。"
     not-enough-players: "{prefix}§c至少需要 {count} 名在线玩家。"
-    teleport-failed: "{prefix}§c有玩家传送失败，游戏已安全取消。"
-    compass-no-space: "{prefix}§c以下玩家没有空位放置追踪指南针，游戏已安全取消：{players}"
+    not-enough-random: "{prefix}§c无法开局：随机玩家不足，还缺 {count} 名可补位的速通者。请调整选队或速通者人数。"
+    teleport-failed: "{prefix}§c有玩家传送失败，游戏已取消。"
+    compass-no-space: "{prefix}§c有玩家背包空间不足，游戏已取消：{players}"
     countdown-title: "§e{seconds}"
     title: "§a游戏开始"
     role-subtitle: "§f你的角色：{role}"
     runners: "{prefix}§f速通者：§c{players}"
   status:
+    surviving-runners: "{prefix}§f存活速通者：§e{alive}/{total}"
     idle: "{prefix}§e当前没有进行中的游戏。"
     countdown: "{prefix}§e游戏准备中，参与者 {count} 人，剩余 {seconds} 秒。"
     running: "{prefix}§f参与者：§e{count}§f；已用时间：§e{elapsed}"
@@ -38,14 +40,10 @@ game:
 
       §c速通者§6：§f{runners}
       §b猎人§6：§f{hunters}
-      §6轮次历史：
-      {round-history}
     killer-section: "§6 击杀者：§f{player}"
-    history-round-line: "§e第 {round} 轮：§f{players}"
-    history-detail-line: "  §7- {duration} | {reason}"
 config:
   header: "{prefix}§f配置项："
-  entry: "§7- §e{key}§7 = §f{value}"
+  entry: "§7- §e{key}§7 ： §f{value}"
   unknown: "{prefix}§c未知配置项：{key}"
   invalid: "{prefix}§c配置值无效：{reason}"
   reason:
@@ -54,11 +52,37 @@ config:
     out-of-range: "必须在 {min} 到 {max} 之间"
   saved: "{prefix}§a已将 {key} 设置为 {value}。"
   save-failed: "{prefix}§c配置保存失败，原值未改变。"
-  usage: "{prefix}§e用法：/rmh config [配置项] [数值]"
+  usage: "{prefix}§e用法：/mhu config [配置项] [数值]"
+  name:
+    runner-count: "速通者人数"
+    allow-blaze-spawner-break: "允许破坏烈焰人刷怪笼"
+    runner-compass-enabled: "速通者指南针"
+    hunter-compass-enabled: "猎人指南针"
+    reset-players-at-start: "开局重置玩家"
+    show-chat-prefix: "显示聊天前缀"
+    tracking-retarget-distance-blocks: "重新定位移动距离"
+    tracking-retarget-cooldown-seconds: "重新定位冷却时间"
+    tracking-search-radius-blocks: "结构搜索半径"
+team:
+  prompt: "{prefix}§e选择队伍："
+  button:
+    hunter: "§b[猎人]"
+    runner: "§c[速通者]"
+    random: "§f[随机]"
+  name:
+    hunter: "§b猎人"
+    runner: "§c速通者"
+    random: "§f随机"
+  player-only: "{prefix}§c只有在线玩家可以选择队伍。"
+  usage: "{prefix}§e用法：/mhu join <hunter|runner|random>"
+  selected: "{prefix}§a已选择队伍：{team}§a。"
+  runner-full: "{prefix}§c速通者名额已满（{count} 人）。"
+  locked: "{prefix}§c游戏已经开始，当前不能更改选队。"
+  capacity-cleared: "{prefix}§e速通者人数配置减少，你的队伍选择将恢复为随机。"
 restriction:
   blaze-spawner-break-denied: "{prefix}§c不能破坏烈焰人刷怪笼。"
 reason:
-  runner-died: "速通者死亡"
+  runner-died: "所有速通者已淘汰"
   dragon-defeated: "末影龙被击杀"
   dragon-absent: "目标末地没有末影龙"
   admin-stopped: "管理员停止"

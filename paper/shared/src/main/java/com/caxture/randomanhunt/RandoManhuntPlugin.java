@@ -1,10 +1,12 @@
 package com.caxture.randomanhunt;
 
-import com.caxture.randomanhunt.command.RmhCommand;
+import com.caxture.randomanhunt.command.MhuCommand;
+import com.caxture.randomanhunt.command.TeamSelectionPresenter;
 import com.caxture.randomanhunt.client.PaperTrackingClientPublisher;
 import com.caxture.randomanhunt.config.ConfigurationService;
 import com.caxture.randomanhunt.game.GameManager;
 import com.caxture.randomanhunt.game.RoleAssigner;
+import com.caxture.randomanhunt.game.TeamPreference;
 import com.caxture.randomanhunt.i18n.LanguageService;
 import com.caxture.randomanhunt.listener.BlazeSpawnerProtectionListener;
 import com.caxture.randomanhunt.listener.GameEventListener;
@@ -31,6 +33,7 @@ import java.util.Random;
 public final class RandoManhuntPlugin extends JavaPlugin {
     private ActiveGameCoordinator activeGame;
     private PaperTrackingClientPublisher clientPublisher;
+    private IdentityDisplayService identity;
 
     @Override
     public void onEnable() {
@@ -38,10 +41,24 @@ public final class RandoManhuntPlugin extends JavaPlugin {
         ConfigurationService configuration = new ConfigurationService(this);
         LanguageService language = new LanguageService(this, configuration::showChatPrefix);
         GameManager gameManager = new GameManager(new RoleAssigner(new Random()));
+        TeamSelectionPresenter teamPresenter = new TeamSelectionPresenter(language);
+        configuration.onRunnerCountChanged(capacity -> {
+            if (gameManager.activeSession().isPresent()) return;
+            gameManager.teamSelections().trimRunners(capacity).forEach(playerId -> {
+                var player = getServer().getPlayer(playerId);
+                if (player != null && player.isOnline()) language.send(player, "team.capacity-cleared");
+            });
+        });
         PendingPlayerState pendingPlayers = new PendingPlayerState();
         CountdownBlindnessService blindness = new CountdownBlindnessService(getServer(), pendingPlayers);
         PlayerResetService playerReset = new PlayerResetService(getServer());
-        IdentityDisplayService identity = new IdentityDisplayService(getServer());
+        identity = new IdentityDisplayService(getServer());
+        gameManager.teamSelections().onChoiceChanged(playerId -> {
+            TeamPreference preference = gameManager.teamSelections().preferenceOf(playerId);
+            if (gameManager.activeSession().isEmpty() || preference == TeamPreference.RANDOM) {
+                identity.updateLobbyChoice(playerId, preference);
+            }
+        });
         MatchPresentation presentation = new VanillaMatchPresentation(getServer(), language);
         clientPublisher = new PaperTrackingClientPublisher(this);
         CompassTrackingService tracking = new CompassTrackingService(
@@ -64,25 +81,28 @@ public final class RandoManhuntPlugin extends JavaPlugin {
         GameStartCoordinator gameStart = new GameStartCoordinator(
                 getServer(), gameManager, configuration, language, pendingPlayers,
                 blindness, playerReset, activeGame, tracking, clock);
-        RmhCommand handler = new RmhCommand(
-                gameManager, gameStart, activeGame, configuration, language, presentation, clock);
-        PluginCommand command = Objects.requireNonNull(getCommand("rmh"), "rmh command is missing");
+        MhuCommand handler = new MhuCommand(
+                gameManager, gameStart, activeGame, configuration, language, presentation, teamPresenter, clock);
+        PluginCommand command = Objects.requireNonNull(getCommand("mhu"), "mhu command is missing");
         // Let the executor perform the permission check so its denial is localized per client.
         command.setPermission(null);
         command.setExecutor(handler);
         command.setTabCompleter(handler);
 
-        getServer().getPluginManager().registerEvents(new GameEventListener(activeGame), this);
+        getServer().getPluginManager().registerEvents(new GameEventListener(activeGame, gameManager, teamPresenter), this);
         getServer().getPluginManager().registerEvents(new TrackingCompassListener(tracking), this);
         getServer().getPluginManager().registerEvents(clientPublisher, this);
         getServer().getPluginManager().registerEvents(
-                new BlazeSpawnerProtectionListener(language), this);
+                new BlazeSpawnerProtectionListener(language, gameManager, configuration), this);
     }
 
     @Override
     public void onDisable() {
         if (activeGame != null) {
             activeGame.disable();
+        }
+        if (identity != null) {
+            identity.clearLobbyPreviews();
         }
         if (clientPublisher != null) {
             clientPublisher.shutdown();

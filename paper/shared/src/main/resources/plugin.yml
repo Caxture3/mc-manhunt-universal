@@ -4,10 +4,9 @@ main: com.caxture.randomanhunt.RandoManhuntPlugin
 api-version: '${minecraft_version}'
 description: Multi-version Manhunt with fixed roles and companion client UI.
 commands:
-  rmh:
+  mhu:
     description: Controls Manhunt games.
-    usage: /rmh
-    permission: randomanhunt.admin
+    usage: /mhu
 permissions:
   randomanhunt.admin:
     default: op

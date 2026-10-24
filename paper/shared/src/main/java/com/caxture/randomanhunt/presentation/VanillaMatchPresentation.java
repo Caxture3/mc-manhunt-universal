@@ -72,6 +72,9 @@ public final class VanillaMatchPresentation implements MatchPresentation {
                 "players", MatchTextFormatter.names(session.participants(), session.runnerIds())));
         language.send(recipient, "game.status.hunters", Map.of(
                 "players", MatchTextFormatter.names(session.participants(), session.hunterIds())));
+        language.send(recipient, "game.status.surviving-runners", Map.of(
+                "alive", Integer.toString(session.livingRunnerIds().size()),
+                "total", Integer.toString(session.runnerIds().size())));
     }
 
     @Override

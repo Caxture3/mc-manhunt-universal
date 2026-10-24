@@ -3,6 +3,7 @@ package com.caxture.randomanhunt.presentation;
 import com.caxture.randomanhunt.game.GameSession;
 import com.caxture.randomanhunt.game.Participant;
 import com.caxture.randomanhunt.game.Role;
+import com.caxture.randomanhunt.game.TeamPreference;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Server;
@@ -11,6 +12,7 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,14 +21,19 @@ public final class IdentityDisplayService {
     private final IdentityDisplayState state = new IdentityDisplayState();
     private final Map<UUID, String> originalTeams = new LinkedHashMap<>();
     private final Map<UUID, Component> pendingListNameRestores = new LinkedHashMap<>();
+    private final Map<UUID, LobbyOriginal> lobbyOriginals = new LinkedHashMap<>();
     private Team runnerTeam;
     private Team hunterTeam;
+    private Team lobbyRunnerTeam;
+    private Team lobbyHunterTeam;
 
     public IdentityDisplayService(Server server) {
         this.server = server;
     }
 
     public void begin(GameSession session) {
+        // Formal snapshots must describe the display before lobby selection, never its preview.
+        clearLobbyPreviews();
         Scoreboard scoreboard = server.getScoreboardManager().getMainScoreboard();
         String suffix = session.id().toString().substring(0, 8);
         runnerTeam = replaceTeam(scoreboard, "rmh_r_" + suffix, NamedTextColor.RED);
@@ -54,6 +61,8 @@ public final class IdentityDisplayService {
     }
 
     public void clear(GameSession session) {
+        // A cancelled countdown has previews, but no formal identity state yet.
+        clearLobbyPreviews();
         Map<UUID, IdentityDisplayState.OriginalDisplay> originals = state.finish(session.id());
         Scoreboard scoreboard = server.getScoreboardManager().getMainScoreboard();
         for (Participant participant : session.participants()) {
@@ -89,8 +98,67 @@ public final class IdentityDisplayService {
         }
     }
 
+    public void updateLobbyChoice(UUID playerId, TeamPreference preference) {
+        if (preference == TeamPreference.RANDOM) {
+            restoreLobbyPreview(playerId);
+            return;
+        }
+        Player player = server.getPlayer(playerId);
+        if (player == null || !player.isOnline()) return;
+        restorePending(player);
+        Scoreboard scoreboard = server.getScoreboardManager().getMainScoreboard();
+        lobbyOriginals.computeIfAbsent(playerId, ignored -> {
+            Team previous = scoreboard.getEntryTeam(player.getName());
+            return new LobbyOriginal(player.getName(), previous == null ? null : previous.getName(),
+                    player.playerListName());
+        });
+        if (lobbyRunnerTeam == null) {
+            lobbyRunnerTeam = replaceTeam(scoreboard, "rmh_lobby_r", NamedTextColor.RED);
+            lobbyHunterTeam = replaceTeam(scoreboard, "rmh_lobby_h", NamedTextColor.AQUA);
+        }
+        removeFromLobbyTeams(player.getName());
+        boolean runner = preference == TeamPreference.RUNNER;
+        (runner ? lobbyRunnerTeam : lobbyHunterTeam).addEntry(player.getName());
+        colorListName(player, runner ? Role.RUNNER : Role.HUNTER);
+    }
+
+    public void clearLobbyPreviews() {
+        List.copyOf(lobbyOriginals.keySet()).forEach(this::restoreLobbyPreview);
+    }
+
+    private void restoreLobbyPreview(UUID playerId) {
+        LobbyOriginal original = lobbyOriginals.remove(playerId);
+        if (original == null) return;
+        removeFromLobbyTeams(original.name());
+        if (original.teamName() != null) {
+            Team previous = server.getScoreboardManager().getMainScoreboard().getTeam(original.teamName());
+            if (previous != null) previous.addEntry(original.name());
+        }
+        Player player = server.getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            player.playerListName(original.listName());
+        } else {
+            pendingListNameRestores.put(playerId, original.listName());
+        }
+        if (lobbyOriginals.isEmpty()) {
+            unregister(lobbyRunnerTeam);
+            unregister(lobbyHunterTeam);
+            lobbyRunnerTeam = null;
+            lobbyHunterTeam = null;
+        }
+    }
+
+    private void removeFromLobbyTeams(String entry) {
+        if (lobbyRunnerTeam != null) lobbyRunnerTeam.removeEntry(entry);
+        if (lobbyHunterTeam != null) lobbyHunterTeam.removeEntry(entry);
+    }
+
     private void applyRole(Player player, Role role) {
         applyEntry(player.getName(), role);
+        colorListName(player, role);
+    }
+
+    private void colorListName(Player player, Role role) {
         NamedTextColor color = role == Role.RUNNER ? NamedTextColor.RED : NamedTextColor.AQUA;
         Component current = player.playerListName();
         player.playerListName((current == null ? Component.text(player.getName()) : current).color(color));
@@ -135,4 +203,6 @@ public final class IdentityDisplayService {
             team.unregister();
         }
     }
+
+    private record LobbyOriginal(String name, String teamName, Component listName) {}
 }

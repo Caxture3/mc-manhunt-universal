@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public final class GameSession {
     private final UUID id;
@@ -16,6 +18,7 @@ public final class GameSession {
     private MatchSettings settings;
     private final List<RunnerRound> roundHistory = new ArrayList<>();
     private final List<UUID> runnerIds;
+    private final Set<UUID> eliminatedRunners = new LinkedHashSet<>();
     private SessionState state = SessionState.COUNTDOWN;
     private Instant startedAt;
     private Instant currentRoundStartedAt;
@@ -68,6 +71,22 @@ public final class GameSession {
 
     public List<UUID> hunterIds() {
         return participants.stream().map(Participant::id).filter(id -> !runnerIds.contains(id)).toList();
+    }
+
+    public List<UUID> livingRunnerIds() {
+        return runnerIds.stream().filter(id -> !eliminatedRunners.contains(id)).toList();
+    }
+
+    public boolean isEliminatedRunner(UUID playerId) {
+        return eliminatedRunners.contains(playerId);
+    }
+
+    public boolean isRunnerAlive(UUID playerId) {
+        return runnerIds.contains(playerId) && !eliminatedRunners.contains(playerId);
+    }
+
+    boolean eliminateRunner(UUID playerId) {
+        return runnerIds.contains(playerId) && eliminatedRunners.add(playerId);
     }
 
     public Optional<Role> roleOf(UUID playerId) {

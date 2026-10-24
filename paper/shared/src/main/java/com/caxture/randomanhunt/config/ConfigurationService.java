@@ -9,28 +9,41 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.Objects;
+import java.util.function.IntConsumer;
+import java.util.logging.Logger;
 
 public final class ConfigurationService {
-    private final JavaPlugin plugin;
+    private final Logger logger;
     private final File configFile;
     private final YamlConfiguration yaml;
     private final AtomicFileWriter writer;
     private ConfigurationValues values;
+    private IntConsumer runnerCountChanged = ignored -> {};
 
     public ConfigurationService(JavaPlugin plugin) {
         this(plugin, new AtomicFileWriter());
     }
 
     ConfigurationService(JavaPlugin plugin, AtomicFileWriter writer) {
-        this.plugin = plugin;
+        this(prepareConfigFile(plugin), writer, plugin.getLogger());
+    }
+
+    ConfigurationService(File configFile, AtomicFileWriter writer, Logger logger) {
+        this.logger = logger;
         this.writer = writer;
-        this.configFile = new File(plugin.getDataFolder(), "config.yml");
-        if (!configFile.exists()) {
-            plugin.saveResource("config.yml", false);
-        }
+        this.configFile = configFile;
         this.yaml = YamlConfiguration.loadConfiguration(configFile);
         this.values = load();
         persistMissingDefaults();
+    }
+
+    private static File prepareConfigFile(JavaPlugin plugin) {
+        File configFile = new File(plugin.getDataFolder(), "config.yml");
+        if (!configFile.exists()) {
+            plugin.saveResource("config.yml", false);
+        }
+        return configFile;
     }
 
     public synchronized ConfigurationValues values() {
@@ -62,7 +75,12 @@ public final class ConfigurationService {
             return false;
         }
         values = updated;
+        if (key == IntConfigKey.RUNNER_COUNT) runnerCountChanged.accept(value);
         return true;
+    }
+
+    public synchronized void onRunnerCountChanged(IntConsumer listener) {
+        runnerCountChanged = Objects.requireNonNull(listener);
     }
 
     public synchronized boolean update(BooleanConfigKey key, boolean value) {
@@ -88,7 +106,7 @@ public final class ConfigurationService {
         Set<String> warned = new HashSet<>();
         return ConfigurationValues.fromRaw(raw, key -> {
             if (warned.add(key)) {
-                plugin.getLogger().warning("Missing or invalid configuration value for " + key
+                logger.warning("Missing or invalid configuration value for " + key
                         + "; using the default value.");
             }
         });
@@ -118,7 +136,7 @@ public final class ConfigurationService {
             writer.replace(configFile.toPath(), yaml.saveToString());
             return true;
         } catch (IOException exception) {
-            plugin.getLogger().severe("Could not save " + configFile + ": " + exception.getMessage());
+            logger.severe("Could not save " + configFile + ": " + exception.getMessage());
             return false;
         }
     }

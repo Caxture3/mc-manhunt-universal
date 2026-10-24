@@ -25,8 +25,11 @@ class FixedRolesTest {
         manager.activate(session.id(), START).orElseThrow();
         assertEquals(runners, session.runnerIds());
         assertThrows(UnsupportedOperationException.class, () -> session.runnerIds().clear());
-        GameResult result = manager.recordRunnerDeath(session.id(), runners.getFirst(),
-                Optional.empty(), START.plus(Duration.ofDays(10))).orElseThrow();
+        assertTrue(manager.recordRunnerDeath(session.id(), runners.getFirst(),
+                Optional.empty(), START.plus(Duration.ofDays(10))).isEmpty());
+        assertEquals(SessionState.RUNNING, session.state());
+        GameResult result = manager.recordRunnerDeath(session.id(), runners.getLast(),
+                Optional.empty(), START.plus(Duration.ofDays(10)).plusSeconds(1)).orElseThrow();
         assertEquals(runners, result.runners());
         assertEquals(1, result.roundHistory().size());
         assertEquals(runners, result.roundHistory().getFirst().runners());

@@ -7,7 +7,8 @@ public enum BooleanConfigKey {
     RUNNER_COMPASS_ENABLED("runner-compass-enabled", true),
     HUNTER_COMPASS_ENABLED("hunter-compass-enabled", true),
     RESET_PLAYERS_AT_START("reset-players-at-start", true),
-    SHOW_CHAT_PREFIX("show-chat-prefix", true);
+    SHOW_CHAT_PREFIX("show-chat-prefix", true),
+    ALLOW_BLAZE_SPAWNER_BREAK("allow-blaze-spawner-break", false);
 
     private final String configKey;
     private final boolean defaultValue;
