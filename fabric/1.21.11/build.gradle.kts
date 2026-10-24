@@ -9,7 +9,7 @@ extra["fabricApiVersion"] = libs.versions.fabric.api12111.get()
 loom {
     splitEnvironmentSourceSets()
     mods {
-        create("manhunt_universal") {
+        create("randomanhunt") {
             sourceSet(sourceSets.main.get())
             sourceSet(sourceSets["client"])
         }

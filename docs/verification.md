@@ -1,5 +1,7 @@
 # 骨架验证记录
 
+本文件为初始骨架的历史记录；迁移后的最新状态见 [迁移验证记录](migration-verification.md)。
+
 验证日期：2026-10-24。环境：Windows、Gradle 9.8.2、JDK 25.0.4.1，JDK 21 toolchain。
 
 ## 已执行

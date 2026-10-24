@@ -1,0 +1,8 @@
+runner-count: 1
+runner-compass-enabled: true
+hunter-compass-enabled: true
+reset-players-at-start: true
+show-chat-prefix: true
+tracking-retarget-distance-blocks: 512
+tracking-retarget-cooldown-seconds: 30
+tracking-search-radius-blocks: 4096

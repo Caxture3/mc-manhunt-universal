@@ -1,0 +1,110 @@
+prefix: "§8[§cManhuntUniversal§8] §r"
+identity:
+  runner: "§cSpeedrunner"
+  hunter: "§bHunter"
+command:
+  no-permission: "{prefix}§cYou do not have permission to use this command."
+  usage: "{prefix}§eUsage: /rmh <start [1-60 seconds]|status|stop|config>"
+  unknown: "{prefix}§cUnknown subcommand."
+game:
+  start:
+    usage: "{prefix}§eUsage: /rmh start [1-60 seconds]"
+    countdown-not-integer: "{prefix}§cThe countdown must be an integer."
+    countdown-out-of-range: "{prefix}§cThe countdown must be between 1 and 60 seconds."
+    already-running: "{prefix}§cA game is already in progress."
+    not-enough-players: "{prefix}§cAt least {count} online players are required."
+    teleport-failed: "{prefix}§cA player could not be teleported; the game was cancelled safely."
+    compass-no-space: "{prefix}§cThe game was cancelled safely because these players have no slot for a tracking compass: {players}"
+    countdown-title: "§e{seconds}"
+    title: "§aGame Start"
+    role-subtitle: "§fYour role: {role}"
+    runners: "{prefix}§fSpeedrunners: §c{players}"
+  status:
+    idle: "{prefix}§eNo game is currently active."
+    countdown: "{prefix}§eThe game is preparing with {count} participants; {seconds} seconds remain."
+    running: "{prefix}§fParticipants: §e{count}§f; elapsed: §e{elapsed}"
+    runners: "{prefix}§fSpeedrunners: §c{players}"
+    hunters: "{prefix}§fHunters: §b{players}"
+  stop:
+    none: "{prefix}§cThere is no game to stop."
+    done: "{prefix}§eThe game was stopped by an administrator."
+    plugin-disabled: "{prefix}§eThe plugin was disabled and the game was stopped."
+  result:
+    runners-title: "§cSpeedrunners Win"
+    hunters-title: "§bHunters Win"
+    full-report: |-
+      {prefix}§6════ Game Result ════
+      §6Winner: {winner}§6 - {reason}{killer-section}
+
+      §cSpeedrunners§6: §f{runners}
+      §bHunters§6: §f{hunters}
+      §6Round history:
+      {round-history}
+    killer-section: " by §b{player}"
+    history-round-line: "§eRound {round}: §f{players}"
+    history-detail-line: "  §7- {duration} | {reason}"
+config:
+  header: "{prefix}§fConfiguration:"
+  entry: "§7- §e{key}§7 = §f{value}"
+  unknown: "{prefix}§cUnknown configuration key: {key}"
+  invalid: "{prefix}§cInvalid configuration value: {reason}"
+  reason:
+    not-integer: "it must be an integer"
+    invalid-boolean: "it must be true or false"
+    out-of-range: "it must be between {min} and {max}"
+  saved: "{prefix}§aSet {key} to {value}."
+  save-failed: "{prefix}§cCould not save the configuration; the previous value remains active."
+  usage: "{prefix}§eUsage: /rmh config [key] [value]"
+restriction:
+  blaze-spawner-break-denied: "{prefix}§cBlaze spawners cannot be broken."
+reason:
+  runner-died: "speedrunner died"
+  dragon-defeated: "Ender Dragon defeated"
+  dragon-absent: "no Ender Dragon in the target End"
+  admin-stopped: "stopped by an administrator"
+  plugin-disabled: "plugin disabled"
+winner:
+  runners: "§cSpeedrunners"
+  hunters: "§bHunters"
+common:
+  none: "none"
+  offline: "offline"
+unit:
+  blocks: "blocks"
+tracking:
+  target:
+    village: "Village"
+    nether-fortress: "Nether Fortress"
+    bastion-remnant: "Bastion Remnant"
+    none: "None"
+  dimension:
+    overworld: "Overworld"
+    nether: "Nether"
+    end: "End"
+    other: "Other Dimension"
+    unknown: "Unknown Dimension"
+  compass:
+    name: "§dTracking Compass"
+    lore-runner-use: "§7Hold to view the target; right-click to choose."
+    lore-hunter-use: "§7Hold to track the nearest speedrunner."
+    lore-bound: "§cGame item: cannot be dropped or stored in containers"
+    no-space: "{prefix}§cFree an inventory slot to receive your tracking compass."
+  dialog:
+    title: "§6Choose Tracking Target"
+    button: "§f{target}"
+    button-selected: "§a✓ {target}"
+    tooltip: "§7Choose the current target again to stop tracking"
+  selection:
+    changed: "{prefix}§aTracking target changed to {target}."
+    cleared: "{prefix}§eTracking stopped."
+  actionbar:
+    same-dimension: "§f{target} §7| Distance: §e{distance} {unit} §7| {dimension}"
+    cross-dimension: "§f{target} §7| Distance: §e-- §7| {dimension}"
+    hunter-live: "§f{target} §7| Distance: §e{distance} {unit} §7| {dimension}"
+    hunter-last-known: "§f{target} §7| Distance: §e-- §7| {dimension}"
+    runner-unavailable: "§cNo speedrunner has a recorded position in this dimension"
+    searching: "§f{target} §7| §eLocating… §7| {dimension}"
+    searching-portal: "§f{target} §7| §eLocating a portal… §7| {dimension}"
+    not-found: "§f{target} §7| §cNot found in range §7| {dimension}"
+    no-portal: "§f{target} §7| §cNo portal found in this dimension §7| {dimension}"
+    runner-select-target: "§7Right-click to choose a tracking target"

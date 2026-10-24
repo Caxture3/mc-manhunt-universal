@@ -10,5 +10,6 @@
 Thumbs.db
 *.log
 local.properties
+dist/
 
 releases

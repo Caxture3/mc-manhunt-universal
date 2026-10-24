@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
-  "id": "manhunt_universal",
+  "id": "randomanhunt",
   "version": "${version}",
   "name": "ManhuntUniversal",
-  "description": "Multi-version manhunt companion client skeleton.",
+  "description": "Optional companion UI for the ManhuntUniversal Paper plugin.",
+  "authors": ["Caxture"],
   "environment": "client",
   "license": "All-Rights-Reserved",
   "entrypoints": {
-    "client": ["com.caxture.manhunt.fabric.ManhuntClient"]
+    "client": ["com.caxture.randomanhunt.fabric.RandoManhuntClient"]
   },
   "depends": {
     "fabricloader": ">=${loader_version}",

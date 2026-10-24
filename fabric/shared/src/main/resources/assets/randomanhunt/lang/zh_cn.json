@@ -1,0 +1,12 @@
+{
+  "randomanhunt.tracking_selector.title.zh": "选择追踪目标",
+  "randomanhunt.tracking_selector.title.en": "Select Tracking Target",
+  "randomanhunt.tracking_selector.option.village.zh": "村庄",
+  "randomanhunt.tracking_selector.option.village.en.1": "Village",
+  "randomanhunt.tracking_selector.option.nether_fortress.zh": "下界堡垒",
+  "randomanhunt.tracking_selector.option.nether_fortress.en.1": "Nether",
+  "randomanhunt.tracking_selector.option.nether_fortress.en.2": "Fortress",
+  "randomanhunt.tracking_selector.option.bastion_remnant.zh": "堡垒遗迹",
+  "randomanhunt.tracking_selector.option.bastion_remnant.en.1": "Bastion",
+  "randomanhunt.tracking_selector.option.bastion_remnant.en.2": "Remnant"
+}

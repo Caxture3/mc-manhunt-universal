@@ -1,6 +1,14 @@
 name: ManhuntUniversal
 version: '${version}'
-main: com.caxture.manhunt.paper.ManhuntPlugin
+main: com.caxture.randomanhunt.RandoManhuntPlugin
 api-version: '${minecraft_version}'
-description: Multi-version manhunt plugin skeleton.
+description: Multi-version Manhunt with fixed roles and companion client UI.
+commands:
+  rmh:
+    description: Controls Manhunt games.
+    usage: /rmh
+    permission: randomanhunt.admin
+permissions:
+  randomanhunt.admin:
+    default: op
 

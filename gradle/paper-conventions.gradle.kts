@@ -2,6 +2,8 @@ import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.api.tasks.testing.Test
+import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.language.jvm.tasks.ProcessResources
 
 val minecraftVersion = extra["minecraftVersion"] as String
@@ -23,7 +25,15 @@ configure<SourceSetContainer> {
         java.srcDir(rootProject.file("paper/shared/src/main/java"))
         resources.srcDir(rootProject.file("paper/shared/src/main/resources"))
     }
+    named("test") {
+        java.srcDir(rootProject.file("paper/shared/src/test/java"))
+    }
 }
+
+val catalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
+dependencies.add("testImplementation", catalog.findLibrary("junit").get())
+dependencies.add("testRuntimeOnly", catalog.findLibrary("junit-platform-launcher").get())
+tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 // Compile against and embed the pure Java modules; no separate runtime installation needed.
 for (module in listOf(":common", ":protocol")) {

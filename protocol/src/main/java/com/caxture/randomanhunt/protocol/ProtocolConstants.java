@@ -1,0 +1,10 @@
+package com.caxture.randomanhunt.protocol;
+
+public final class ProtocolConstants {
+    public static final int VERSION = 1;
+    public static final String CHANNEL = ProtocolNamespace.NAMESPACE + ":main";
+    public static final int MAX_PAYLOAD_BYTES = 1024;
+
+    private ProtocolConstants() {
+    }
+}

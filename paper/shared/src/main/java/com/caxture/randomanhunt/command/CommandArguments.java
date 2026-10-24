@@ -1,0 +1,61 @@
+package com.caxture.randomanhunt.command;
+
+import com.caxture.randomanhunt.config.IntConfigKey;
+
+public final class CommandArguments {
+    private CommandArguments() {
+    }
+
+    public static int countdown(String raw) {
+        int value = parseInteger(raw);
+        if (value < 1 || value > 60) {
+            throw new InvalidArgument(Error.OUT_OF_RANGE);
+        }
+        return value;
+    }
+
+    public static int integer(IntConfigKey key, String raw) {
+        int value = parseInteger(raw);
+        if (!key.valid(value)) {
+            throw new InvalidArgument(Error.OUT_OF_RANGE);
+        }
+        return value;
+    }
+
+    public static boolean bool(String raw) {
+        if ("true".equalsIgnoreCase(raw)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(raw)) {
+            return false;
+        }
+        throw new InvalidArgument(Error.INVALID_BOOLEAN);
+    }
+
+    private static int parseInteger(String raw) {
+        try {
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException exception) {
+            throw new InvalidArgument(Error.NOT_INTEGER);
+        }
+    }
+
+    public enum Error {
+        NOT_INTEGER,
+        OUT_OF_RANGE,
+        INVALID_BOOLEAN
+    }
+
+    public static final class InvalidArgument extends IllegalArgumentException {
+        private final Error error;
+
+        public InvalidArgument(Error error) {
+            super(error.name());
+            this.error = error;
+        }
+
+        public Error error() {
+            return error;
+        }
+    }
+}

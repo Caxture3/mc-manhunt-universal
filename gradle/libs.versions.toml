@@ -7,6 +7,8 @@ paper12111 = "1.21.11-R0.1-SNAPSHOT"
 paper263 = "26.3.build.200-stable"
 fabric-api12111 = "0.141.6+1.21.11"
 fabric-api263 = "0.163.0+26.3"
+junit = "5.11.4"
+junit-platform = "1.11.4"
 
 [libraries]
 paper12111 = { module = "io.papermc.paper:paper-api", version.ref = "paper12111" }
@@ -14,6 +16,8 @@ paper263 = { module = "io.papermc.paper:paper-api", version.ref = "paper263" }
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 fabric-api12111 = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api12111" }
 fabric-api263 = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api263" }
+junit = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 
 [plugins]
 loom = { id = "net.fabricmc.fabric-loom", version.ref = "loom" }
