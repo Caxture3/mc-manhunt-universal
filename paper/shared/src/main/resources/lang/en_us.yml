@@ -54,6 +54,9 @@ config:
   save-failed: "{prefix}§cCould not save the configuration; the previous value remains active."
   usage: "{prefix}§eUsage: /mhu config [key] [value]"
   name:
+    ore-fortune-level: "Virtual ore Fortune level"
+    adjust-piglin-bartering: "Adjusted piglin bartering"
+    hunter-end-restriction-enabled: "Require runner End entry before hunters"
     runner-count: "Speedrunner count"
     allow-blaze-spawner-break: "Allow breaking blaze spawners"
     runner-compass-enabled: "Speedrunner compass"
@@ -80,6 +83,7 @@ team:
   locked: "{prefix}§cThe game has started; team choices are locked."
   capacity-cleared: "{prefix}§eThe speedrunner limit was reduced, your choice is now random."
 restriction:
+  hunter-end-locked: "{prefix}§cA living speedrunner must enter the End before hunters can insert Eyes of Ender or enter the End."
   blaze-spawner-break-denied: "{prefix}§cBlaze spawners cannot be broken."
 reason:
   runner-died: "All speedrunners eliminated"

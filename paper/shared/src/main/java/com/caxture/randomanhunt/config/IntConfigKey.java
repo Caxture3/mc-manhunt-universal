@@ -5,6 +5,7 @@ import java.util.Optional;
 
 public enum IntConfigKey {
     RUNNER_COUNT("runner-count", 1, 1, 100),
+    ORE_FORTUNE_LEVEL("ore-fortune-level", 0, 0, 10),
     TRACKING_RETARGET_DISTANCE_BLOCKS("tracking-retarget-distance-blocks", 512, 64, 8192),
     TRACKING_RETARGET_COOLDOWN_SECONDS("tracking-retarget-cooldown-seconds", 30, 1, 600),
     TRACKING_SEARCH_RADIUS_BLOCKS("tracking-search-radius-blocks", 4096, 256, 16_384);

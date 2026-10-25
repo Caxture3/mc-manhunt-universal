@@ -1,23 +1,14 @@
 # ManhuntUniversal 穹猎追杀
 
-支持 Minecraft **1.21.11、26.3** 的 **Paper 服务端插件 + Fabric 客户端配套模组**。已从 `E:\coding\mc-randomanhunt-plugin-26.3` 迁移除局中随机轮换角色以外的全部功能；开局前可选队，速通者名额不足时仅从随机玩家中补足，每局身份固定。
+适用于 Minecraft Paper 服务端与 Fabric 客户端的跨版本项目，支持 1.21.11 和 26.3。
 
-## 玩法与功能
+## 安装
 
-- `/mhu start` 锁定当时在线的参与者与角色；优先采用指定速通者，从随机玩家中补足 `runner-count`，其余为猎人。可使用 1 至 60 秒倒计时；候选不足时拒绝开局。
-- 保留可选开局重置、失败安全传送、断线重连补重置、倒计时临时失明恢复及身份颜色/Tab 显示与清理。
-- 速通者死亡后淘汰并自动复活进入旁观模式，全部速通者淘汰才判猎人获胜；断线不算死亡。首名存活速通者进入的末地为目标末地，该世界屠龙或满足原有无龙检查条件时速通者获胜。
-- 淘汰者重连保持旁观，游戏结束/停止后恢复淘汰前模式；离线者在重连时补恢复。猎人指南针只追踪存活速通者，淘汰者的指南针和选择授权失效。
-- 保留绑定指南针的发放、禁止转移、猎人死亡保留、无空间重试；存活速通者选择村庄、下界堡垒、堡垒遗迹。
-- 保留结构搜索队列、缓存、跨维度已有传送门引导；不会创建或破坏传送门。
-- 安装配套模组时显示原三栏图片选择界面；无模组或握手不兼容时使用 Paper Dialog。
-- 提供仅在正式游戏期间生效的烈焰人刷怪笼保护配置，以及双语资源、外部语言覆盖、原子配置保存、结束与停用清理。
-
-已移除局中角色轮换计时、手动重抽、轮换参数、轮换提示与结算中的轮次历史。
+将对应游戏版本的 Paper 插件放入服务器 `plugins/` 目录。可选的 Fabric 模组放入客户端 `mods/` 目录，并安装对应版本的 Fabric Loader 和 Fabric API。部署文件位置见[构建产物](#构建产物)。
 
 ## 命令与配置
 
-根命令为 `/mhu`，不保留旧命令别名。
+根命令为 `/mhu`。
 
 - `/mhu join hunter|runner|random`：所有玩家均可选队，random 清除明确选择；不带队伍时显示可点击提示。
 - `/mhu start [秒数]`、`status`、`stop`、`config [key] [value]`：需要 `randomanhunt.admin`，默认 OP。`status` 显示本局参与者、时间和固定身份名单。
@@ -28,9 +19,25 @@
 
 配置列表及单项查询显示本地化名称，鼠标悬停显示内部键。点击布尔项立即切换当前值并刷新该项；点击数值项会打开聊天输入，预填 `/mhu config <内部名称> `。布尔交互再次检查权限，旧消息也按当前配置值切换；按钮有效期为一小时，过期后可重新查询配置。
 
-默认配置及服务端语言文件在 `plugins/ManhuntUniversal/`。原配置语义保持：`runner-count` 默认 1；两种指南针、聊天前缀和 `reset-players-at-start` 默认开启。开局重置会按旧实现清理参与者物品、状态、经验、进度并传送至出生点；可通过配置关闭。三个 `tracking-*` 参数保留原范围与下一局生效规则。`runner-switch-min-seconds` / `runner-switch-max-seconds` 已删除。
+默认配置及服务端语言文件在 `plugins/ManhuntUniversal/`。原配置语义保持：`runner-count` 默认 1；两种指南针、聊天前缀和 `reset-players-at-start` 默认开启。开局重置会按旧实现清理参与者物品、状态、经验、进度并传送至出生点；可通过配置关闭。三个 `tracking-*` 参数在下一局生效。
 
 `allow-blaze-spawner-break` 默认为 `false`，只在正式游戏 RUNNING 时禁止破坏普通烈焰人刷怪笼，包含 OP 和局外玩家。空闲、倒计时及结算后允许破坏；其他种类刷怪笼不受此规则影响。通过 `/mhu config allow-blaze-spawner-break true` 或点击配置项可即时允许破坏。
+
+三项可选优化默认关闭，可通过配置列表交互或以下命令开启，仅在正式游戏期间生效：
+
+| 配置项 | 默认值 | 作用 |
+| --- | --- | --- |
+| `ore-fortune-level` | `0` | 矿物虚拟时运等级，整数 0–10；0 关闭，取配置与工具已有时运的较高值，精准采集保持原样。 |
+| `adjust-piglin-bartering` | `false` | 调整为平均每 64 金锭产出约 16 珍珠、10 黑曜石、3 瓶抗火（普通与喷溅合计）；每次仍一种结果。 |
+| `hunter-end-restriction-enabled` | `false` | 任一存活速通者进入末地之前，禁止本局猎人放置末影之眼或进入末地；解锁持续到本局结束。 |
+
+```text
+/mhu config ore-fortune-level 3
+/mhu config adjust-piglin-bartering true
+/mhu config hunter-end-restriction-enabled true
+```
+
+时运和交易优化对正式游戏期间的所有玩家生效，空闲和倒计时不生效。详见[优化配置与概率说明](docs/optional-optimizations.md)。
 
 ## 版本矩阵
 
@@ -72,7 +79,7 @@ common/                 纯 Java 公共逻辑预留区（Java 21）
 protocol/               原项目协议及编解码（Java 21，保持原样）
 paper/
   shared/src/main/      两版本共享的服务端逻辑、入口、资源
-  shared/src/test/      少量固定身份和胜负检查
+  shared/src/test/      服务端逻辑的针对性检查
   1.21.11/              :paper-1.21.11，版本适配与构建
   26.3/                 :paper-26.3，版本适配与构建
 fabric/
@@ -81,14 +88,14 @@ fabric/
   1.21.11/              :fabric-1.21.11，版本适配与构建
   26.3/                 :fabric-26.3，版本适配与构建
 gradle/                 Wrapper、版本目录、公共构建配置
-docs/                   设计、迁移与验证记录
+docs/                   使用说明、设计与验证记录
 ```
 
 每个版本模块使用 Gradle 默认的 `src/main/java`、`src/main/resources`；Fabric 另有 `src/client/java`。Paper 仅传送门 POI 查询有版本适配：26.3 沿用原 API，1.21.11 在原同步队列中桥接原版 POI 查询。Fabric 将渲染、输入、网络注册和 shader 差异放在版本目录，其余源码和素材共享。
 
 ## 构建产物
 
-在各版本模块的 `build/libs/` 中取部署 JAR。本次已构建的四个部署文件另整理在 `dist/1.21.11/`、`dist/26.3/`，校验和见 `dist/SHA256SUMS.txt`；后续重新构建以 `build/libs/` 为准。
+构建后在各版本模块的 `build/libs/` 中取得部署 JAR。
 
 | 模块 | 部署产物（当前版本 0.1.0-SNAPSHOT） |
 | --- | --- |
@@ -103,8 +110,10 @@ Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版
 
 聊天前缀按客户端语言显示为 `穹猎追杀` / `Manhunt Universal`。升级不会自动改写 `plugins/ManhuntUniversal/lang/` 下的旧语言文件；已有服务器请按 [语言更新说明](docs/lobby-config.md) 手动更新相关条目。
 
-## 验证范围
+## 相关说明
 
-按要求执行精简验证：两个版本编译打包、选队/固定身份/消息交互的针对性检查，以及部署 JAR 的元数据、Java 字节码、协议和素材核对。没有运行整套旧测试或完整游戏流程。最新变更见 [选队与配置说明](docs/lobby-config.md)；旧工程迁移过程见 [迁移记录](docs/migration.md)。
+- [选队、配置交互和外部语言文件维护](docs/lobby-config.md)
+- [速通者淘汰、身份颜色和刷怪笼保护](docs/elimination-and-colors.md)
+- [矿物时运、猪灵交易和末地限制](docs/optional-optimizations.md)
 
-技术依据：[Paper 项目配置](https://docs.papermc.io/paper/dev/project-setup/)、[Paper Java 要求](https://docs.papermc.io/paper/getting-started/)、[Fabric Loom 插件区分](https://docs.fabricmc.net/develop/loom/)、[Fabric 26.3 开发说明](https://www.fabricmc.net/2026/09/15/263.html)。
+技术依据：[Paper 项目配置](https://docs.papermc.io/paper/dev/project-setup/)、[Paper Java 要求](https://docs.papermc.io/paper/getting-started/)、[Fabric Loom 插件区分](https://docs.fabricmc.net/develop/loom/)。

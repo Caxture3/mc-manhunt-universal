@@ -131,6 +131,13 @@ public final class ActiveGameCoordinator {
         identity.begin(activated);
         tracking.start(activated);
         presentation.showStart(activated);
+        // With player reset disabled, a runner may already be in the End at activation.
+        activated.livingRunnerIds().forEach(playerId -> {
+            Player player = server.getPlayer(playerId);
+            if (player != null && player.isOnline() && player.getWorld().getEnvironment() == World.Environment.THE_END) {
+                playerChangedWorld(player);
+            }
+        });
         return true;
     }
 
@@ -235,6 +242,9 @@ public final class ActiveGameCoordinator {
         blindness.restore(player);
         identity.applyJoiningPlayer(session, player);
         tracking.playerJoined(player, session);
+        if (session.isRunnerAlive(player.getUniqueId()) && player.getWorld().getEnvironment() == World.Environment.THE_END) {
+            playerChangedWorld(player);
+        }
     }
 
     public void playerQuit(Player player) {

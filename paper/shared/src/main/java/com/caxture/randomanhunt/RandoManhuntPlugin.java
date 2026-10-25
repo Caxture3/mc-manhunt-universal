@@ -10,6 +10,9 @@ import com.caxture.randomanhunt.game.TeamPreference;
 import com.caxture.randomanhunt.i18n.LanguageService;
 import com.caxture.randomanhunt.listener.BlazeSpawnerProtectionListener;
 import com.caxture.randomanhunt.listener.GameEventListener;
+import com.caxture.randomanhunt.optimization.HunterEndAccessListener;
+import com.caxture.randomanhunt.optimization.OreFortuneListener;
+import com.caxture.randomanhunt.optimization.PiglinBarterListener;
 import com.caxture.randomanhunt.player.CountdownBlindnessService;
 import com.caxture.randomanhunt.player.PendingPlayerState;
 import com.caxture.randomanhunt.player.PlayerResetService;
@@ -94,6 +97,9 @@ public final class RandoManhuntPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(clientPublisher, this);
         getServer().getPluginManager().registerEvents(
                 new BlazeSpawnerProtectionListener(language, gameManager, configuration), this);
+        getServer().getPluginManager().registerEvents(new OreFortuneListener(this, gameManager, configuration), this);
+        getServer().getPluginManager().registerEvents(new PiglinBarterListener(gameManager, configuration), this);
+        getServer().getPluginManager().registerEvents(new HunterEndAccessListener(gameManager, configuration, language), this);
     }
 
     @Override

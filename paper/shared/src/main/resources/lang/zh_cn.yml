@@ -54,6 +54,9 @@ config:
   save-failed: "{prefix}§c配置保存失败，原值未改变。"
   usage: "{prefix}§e用法：/mhu config [配置项] [数值]"
   name:
+    ore-fortune-level: "矿物虚拟时运等级"
+    adjust-piglin-bartering: "优化猪灵交易"
+    hunter-end-restriction-enabled: "速通者先进入末地"
     runner-count: "速通者人数"
     allow-blaze-spawner-break: "允许破坏烈焰人刷怪笼"
     runner-compass-enabled: "速通者指南针"
@@ -80,6 +83,7 @@ team:
   locked: "{prefix}§c游戏已经开始，当前不能更改选队。"
   capacity-cleared: "{prefix}§e速通者人数配置减少，你的队伍选择将恢复为随机。"
 restriction:
+  hunter-end-locked: "{prefix}§c速通者尚未进入末地，猎人暂时不能放置末影之眼或进入末地。"
   blaze-spawner-break-denied: "{prefix}§c不能破坏烈焰人刷怪笼。"
 reason:
   runner-died: "所有速通者已淘汰"

@@ -4,6 +4,9 @@ hunter-compass-enabled: true
 reset-players-at-start: true
 show-chat-prefix: true
 allow-blaze-spawner-break: false
+ore-fortune-level: 0
+adjust-piglin-bartering: false
+hunter-end-restriction-enabled: false
 tracking-retarget-distance-blocks: 512
 tracking-retarget-cooldown-seconds: 30
 tracking-search-radius-blocks: 4096
