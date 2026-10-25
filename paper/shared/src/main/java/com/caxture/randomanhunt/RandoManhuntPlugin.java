@@ -4,6 +4,7 @@ import com.caxture.randomanhunt.command.MhuCommand;
 import com.caxture.randomanhunt.command.TeamSelectionPresenter;
 import com.caxture.randomanhunt.client.PaperTrackingClientPublisher;
 import com.caxture.randomanhunt.config.ConfigurationService;
+import com.caxture.randomanhunt.config.BooleanConfigKey;
 import com.caxture.randomanhunt.game.GameManager;
 import com.caxture.randomanhunt.game.RoleAssigner;
 import com.caxture.randomanhunt.game.TeamPreference;
@@ -44,25 +45,31 @@ public final class RandoManhuntPlugin extends JavaPlugin {
         ConfigurationService configuration = new ConfigurationService(this);
         LanguageService language = new LanguageService(this, configuration::showChatPrefix);
         GameManager gameManager = new GameManager(new RoleAssigner(new Random()));
-        TeamSelectionPresenter teamPresenter = new TeamSelectionPresenter(language);
+        gameManager.teamSelections().setForcedRandom(configuration.get(BooleanConfigKey.FORCE_RANDOM_ROLES));
+        TeamSelectionPresenter teamPresenter = new TeamSelectionPresenter(language,
+                () -> !gameManager.teamSelections().forcedRandom());
         configuration.onRunnerCountChanged(capacity -> {
             if (gameManager.activeSession().isPresent()) return;
             gameManager.teamSelections().trimRunners(capacity).forEach(playerId -> {
                 var player = getServer().getPlayer(playerId);
-                if (player != null && player.isOnline()) language.send(player, "team.capacity-cleared");
+                if (player != null && player.isOnline()) language.send(player,
+                        configuration.get(BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS)
+                                ? "team.capacity-cleared-hidden" : "team.capacity-cleared");
             });
         });
         PendingPlayerState pendingPlayers = new PendingPlayerState();
         CountdownBlindnessService blindness = new CountdownBlindnessService(getServer(), pendingPlayers);
         PlayerResetService playerReset = new PlayerResetService(getServer());
         identity = new IdentityDisplayService(getServer());
+        identity.setHidden(configuration.get(BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS));
         gameManager.teamSelections().onChoiceChanged(playerId -> {
             TeamPreference preference = gameManager.teamSelections().preferenceOf(playerId);
             if (gameManager.activeSession().isEmpty() || preference == TeamPreference.RANDOM) {
                 identity.updateLobbyChoice(playerId, preference);
             }
         });
-        MatchPresentation presentation = new VanillaMatchPresentation(getServer(), language);
+        MatchPresentation presentation = new VanillaMatchPresentation(getServer(), language,
+                () -> configuration.get(BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS));
         clientPublisher = new PaperTrackingClientPublisher(this);
         CompassTrackingService tracking = new CompassTrackingService(
                 this, gameManager, configuration, language,
@@ -81,6 +88,7 @@ public final class RandoManhuntPlugin extends JavaPlugin {
         activeGame = new ActiveGameCoordinator(
                 this, gameManager, configuration, pendingPlayers, blindness, playerReset,
                 identity, presentation, tracking, clock);
+        configuration.onBooleanChanged(activeGame::configurationChanged);
         GameStartCoordinator gameStart = new GameStartCoordinator(
                 getServer(), gameManager, configuration, language, pendingPlayers,
                 blindness, playerReset, activeGame, tracking, clock);

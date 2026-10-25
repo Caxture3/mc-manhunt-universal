@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Objects;
 import java.util.function.IntConsumer;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 public final class ConfigurationService {
@@ -20,6 +21,7 @@ public final class ConfigurationService {
     private final AtomicFileWriter writer;
     private ConfigurationValues values;
     private IntConsumer runnerCountChanged = ignored -> {};
+    private Consumer<BooleanConfigKey> booleanChanged = ignored -> {};
 
     public ConfigurationService(JavaPlugin plugin) {
         this(plugin, new AtomicFileWriter());
@@ -92,7 +94,12 @@ public final class ConfigurationService {
             return false;
         }
         values = updated;
+        booleanChanged.accept(key);
         return true;
+    }
+
+    public synchronized void onBooleanChanged(Consumer<BooleanConfigKey> listener) {
+        booleanChanged = Objects.requireNonNull(listener);
     }
 
     private ConfigurationValues load() {

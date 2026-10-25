@@ -78,6 +78,63 @@ class LobbyIdentityDisplayTest {
                 .session().orElseThrow();
     }
 
+    @Test
+    void hidingLobbyRestoresOriginalDisplayWithoutChangingChoiceAndUnhidingCanPreviewAgain() {
+        display.updateLobbyChoice(fixture.id, TeamPreference.RUNNER);
+        display.setHidden(true);
+        fixture.assertOriginal();
+        display.updateLobbyChoice(fixture.id, TeamPreference.RUNNER);
+        fixture.assertOriginal();
+        display.setHidden(false);
+        display.updateLobbyChoice(fixture.id, TeamPreference.RUNNER);
+        assertEquals(NamedTextColor.RED, fixture.listName.color());
+        display.clearLobbyPreviews();
+        fixture.assertOriginal();
+    }
+
+    @Test
+    void hidingAndUnhidingAnActiveGameRestoresThenReappliesWithoutLosingOriginals() {
+        GameSession session = countdown();
+        display.begin(session);
+        display.setHidden(true);
+        fixture.assertOriginal();
+        display.applyJoiningPlayer(session, fixture.player);
+        fixture.assertOriginal();
+        display.setHidden(false);
+        assertEquals(NamedTextColor.RED, fixture.listName.color());
+        display.setHidden(false);
+        display.clear(session);
+        fixture.assertOriginal();
+    }
+
+    @Test
+    void gameBeginningHiddenAndEndingHiddenNeverChangesTheOriginalDisplay() {
+        GameSession session = countdown();
+        display.setHidden(true);
+        display.begin(session);
+        fixture.assertOriginal();
+        display.clear(session);
+        display.setHidden(false);
+        fixture.assertOriginal();
+        assertEquals(Set.of("original"), fixture.teams.keySet());
+    }
+
+    @Test
+    void offlinePlayerHiddenDuringGameRestoresOriginalOnJoinAndAfterUnhide() {
+        GameSession session = countdown();
+        display.begin(session);
+        fixture.online = false;
+        display.setHidden(true);
+        assertEquals("original", fixture.entryTeam().getName());
+        display.setHidden(false);
+        fixture.online = true;
+        display.restorePending(fixture.player);
+        display.applyJoiningPlayer(session, fixture.player);
+        assertEquals(NamedTextColor.RED, fixture.listName.color());
+        display.clear(session);
+        fixture.assertOriginal();
+    }
+
     /** Stateful boundary fake: entries can belong to only one scoreboard team, as in Bukkit. */
     private static final class Fixture {
         final UUID id = new UUID(0, 1);

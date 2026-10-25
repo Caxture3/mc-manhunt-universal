@@ -19,6 +19,15 @@
 
 配置列表及单项查询显示本地化名称，鼠标悬停显示内部键。点击布尔项立即切换当前值并刷新该项；点击数值项会打开聊天输入，预填 `/mhu config <内部名称> `。布尔交互再次检查权限，旧消息也按当前配置值切换；按钮有效期为一小时，过期后可重新查询配置。
 
+两个角色配置互相独立，均默认为 `false`：
+
+| 配置项 | 开启后的行为 |
+| --- | --- |
+| `force-random-roles` | 立即清空选队，关闭登录选队提醒和 `/mhu join`，开局统一随机分配；已锁定对局不重分配。 |
+| `hide-role-assignments` | 隐藏选队和实际分配的聊天内容、Tab 和名称牌颜色；保留选队功能、个人身份标题与指南针。 |
+
+开关实时生效，关闭强制随机不会恢复旧选择。隐藏时 `status` 不显示双方名单，结算只显示胜方与原因。详见[角色配置说明](docs/role-options.md)。
+
 默认配置及服务端语言文件在 `plugins/ManhuntUniversal/`。原配置语义保持：`runner-count` 默认 1；两种指南针、聊天前缀和 `reset-players-at-start` 默认开启。开局重置会按旧实现清理参与者物品、状态、经验、进度并传送至出生点；可通过配置关闭。三个 `tracking-*` 参数在下一局生效。
 
 `allow-blaze-spawner-break` 默认为 `false`，只在正式游戏 RUNNING 时禁止破坏普通烈焰人刷怪笼，包含 OP 和局外玩家。空闲、倒计时及结算后允许破坏；其他种类刷怪笼不受此规则影响。通过 `/mhu config allow-blaze-spawner-break true` 或点击配置项可即时允许破坏。
@@ -115,5 +124,6 @@ Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版
 - [选队、配置交互和外部语言文件维护](docs/lobby-config.md)
 - [速通者淘汰、身份颜色和刷怪笼保护](docs/elimination-and-colors.md)
 - [矿物时运、猪灵交易和末地限制](docs/optional-optimizations.md)
+- [强制随机和隐藏角色分配](docs/role-options.md)
 
 技术依据：[Paper 项目配置](https://docs.papermc.io/paper/dev/project-setup/)、[Paper Java 要求](https://docs.papermc.io/paper/getting-started/)、[Fabric Loom 插件区分](https://docs.fabricmc.net/develop/loom/)。

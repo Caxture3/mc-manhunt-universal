@@ -32,6 +32,7 @@ game:
     done: "{prefix}§eThe game was stopped by an administrator."
     plugin-disabled: "{prefix}§eThe plugin was disabled and the game was stopped."
   result:
+    hidden-report: "{prefix}§6Winner: {winner}§6 - {reason}"
     runners-title: "§cSpeedrunners Win"
     hunters-title: "§bHunters Win"
     full-report: |-
@@ -54,6 +55,8 @@ config:
   save-failed: "{prefix}§cCould not save the configuration; the previous value remains active."
   usage: "{prefix}§eUsage: /mhu config [key] [value]"
   name:
+    force-random-roles: "Force random role assignment"
+    hide-role-assignments: "Hide role assignments"
     ore-fortune-level: "Virtual ore Fortune level"
     adjust-piglin-bartering: "Adjusted piglin bartering"
     hunter-end-restriction-enabled: "Require runner End entry before hunters"
@@ -67,6 +70,9 @@ config:
     tracking-retarget-cooldown-seconds: "Retarget cooldown"
     tracking-search-radius-blocks: "Structure search radius"
 team:
+  disabled: "{prefix}§cRole assignment is forced random; team selection is disabled."
+  selected-hidden: "{prefix}§aYour choice has been recorded."
+  capacity-cleared-hidden: "{prefix}§eThe configuration changed; your choice has been cleared."
   prompt: "{prefix}§eChoose a team:"
   button:
     hunter: "§b[Hunter]"

@@ -1,4 +1,6 @@
 runner-count: 1
+force-random-roles: false
+hide-role-assignments: false
 runner-compass-enabled: true
 hunter-compass-enabled: true
 reset-players-at-start: true

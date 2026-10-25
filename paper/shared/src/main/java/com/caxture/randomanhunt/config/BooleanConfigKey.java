@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.Optional;
 
 public enum BooleanConfigKey {
+    FORCE_RANDOM_ROLES("force-random-roles", false),
+    HIDE_ROLE_ASSIGNMENTS("hide-role-assignments", false),
     RUNNER_COMPASS_ENABLED("runner-compass-enabled", true),
     HUNTER_COMPASS_ENABLED("hunter-compass-enabled", true),
     RESET_PLAYERS_AT_START("reset-players-at-start", true),

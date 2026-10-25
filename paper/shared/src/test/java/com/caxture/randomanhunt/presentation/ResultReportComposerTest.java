@@ -12,6 +12,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ResultReportComposerTest {
     @Test
+    void hiddenResultNeverRequestsNamesOrEmitsTeamAndKillerPlaceholders() {
+        UUID runner = new UUID(0, 1), hunter = new UUID(0, 2);
+        GameResult result = new GameResult(UUID.randomUUID(), GameWinner.HUNTERS,
+                GameResultReason.RUNNER_DIED, Instant.EPOCH,
+                List.of(new Participant(runner, "SecretRunner"), new Participant(hunter, "SecretHunter")),
+                List.of(runner), List.of(hunter), List.of(), Optional.of(runner), Optional.of(hunter));
+        var report = ResultReportComposer.compose(result, (key, values) -> {
+            assertFalse(key.contains("killer"));
+            return key;
+        }, id -> { fail("Hidden reports must never resolve participant names"); return ""; }, true);
+        assertEquals("game.result.hidden-report", report.languageKey());
+        assertEquals(java.util.Set.of("winner", "reason"), report.placeholders().keySet());
+        assertFalse(report.placeholders().toString().contains("Secret"));
+    }
+
+    @Test
     void settlementIncludesTeamsAndKillerWithoutRequestingOrRenderingHistory() {
         UUID runner = new UUID(0, 1);
         UUID hunter = new UUID(0, 2);

@@ -13,6 +13,7 @@ public final class TeamSelectionService {
     private final BooleanSupplier locked;
     private final Map<UUID, TeamPreference> choices = new LinkedHashMap<>();
     private Consumer<UUID> choiceChanged = playerId -> {};
+    private boolean forcedRandom;
 
     public TeamSelectionService(BooleanSupplier locked) {
         this.locked = Objects.requireNonNull(locked);
@@ -25,6 +26,7 @@ public final class TeamSelectionService {
     public ChoiceResult choose(UUID playerId, TeamPreference preference, int runnerCapacity) {
         Objects.requireNonNull(playerId);
         Objects.requireNonNull(preference);
+        if (forcedRandom) return ChoiceResult.DISABLED;
         if (locked.getAsBoolean()) return ChoiceResult.LOCKED;
         if (preferenceOf(playerId) == preference) return ChoiceResult.UNCHANGED;
         if (preference == TeamPreference.RUNNER
@@ -43,6 +45,15 @@ public final class TeamSelectionService {
 
     public Map<UUID, TeamPreference> snapshot() {
         return Map.copyOf(choices);
+    }
+
+    public boolean forcedRandom() {
+        return forcedRandom;
+    }
+
+    public void setForcedRandom(boolean enabled) {
+        forcedRandom = enabled;
+        if (enabled) clear();
     }
 
     /** Returns removed reservations in latest-first order; it never changes an active session. */
@@ -67,5 +78,5 @@ public final class TeamSelectionService {
         removed.forEach(choiceChanged);
     }
 
-    public enum ChoiceResult { CHANGED, UNCHANGED, FULL, LOCKED }
+    public enum ChoiceResult { CHANGED, UNCHANGED, FULL, LOCKED, DISABLED }
 }

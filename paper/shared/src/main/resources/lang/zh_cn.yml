@@ -32,6 +32,7 @@ game:
     done: "{prefix}§e游戏已由管理员停止。"
     plugin-disabled: "{prefix}§e插件停用，游戏已停止。"
   result:
+    hidden-report: "{prefix}§6胜方：{winner}§6 - {reason}"
     runners-title: "§c速通者获胜"
     hunters-title: "§b猎人获胜"
     full-report: |-
@@ -54,6 +55,8 @@ config:
   save-failed: "{prefix}§c配置保存失败，原值未改变。"
   usage: "{prefix}§e用法：/mhu config [配置项] [数值]"
   name:
+    force-random-roles: "强制随机分配角色"
+    hide-role-assignments: "隐藏角色分配"
     ore-fortune-level: "矿物虚拟时运等级"
     adjust-piglin-bartering: "优化猪灵交易"
     hunter-end-restriction-enabled: "速通者先进入末地"
@@ -67,6 +70,9 @@ config:
     tracking-retarget-cooldown-seconds: "重新定位冷却时间"
     tracking-search-radius-blocks: "结构搜索半径"
 team:
+  disabled: "{prefix}§c已开启强制随机分配，不能选择队伍。"
+  selected-hidden: "{prefix}§a已记录你的选择。"
+  capacity-cleared-hidden: "{prefix}§e配置已变更，你的选择已清除。"
   prompt: "{prefix}§e选择队伍："
   button:
     hunter: "§b[猎人]"

@@ -90,6 +90,10 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             language.send(sender, "team.player-only");
             return;
         }
+        if (gameManager.teamSelections().forcedRandom()) {
+            language.send(player, "team.disabled");
+            return;
+        }
         if (args.length == 1) {
             teamPresenter.show(player);
             return;
@@ -105,11 +109,18 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         TeamSelectionService.ChoiceResult result = gameManager.teamSelections().choose(
                 player.getUniqueId(), preference, configuration.get(IntConfigKey.RUNNER_COUNT));
         switch (result) {
+            case DISABLED -> language.send(player, "team.disabled");
             case FULL -> language.send(player, "team.runner-full", Map.of(
                     "count", Integer.toString(configuration.get(IntConfigKey.RUNNER_COUNT))));
             case LOCKED -> language.send(player, "team.locked");
-            case CHANGED, UNCHANGED -> language.send(player, "team.selected", Map.of(
-                    "team", language.text(player, "team.name." + preference.name().toLowerCase(Locale.ROOT))));
+            case CHANGED, UNCHANGED -> {
+                if (configuration.get(BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS)) {
+                    language.send(player, "team.selected-hidden");
+                } else {
+                    language.send(player, "team.selected", Map.of(
+                            "team", language.text(player, "team.name." + preference.name().toLowerCase(Locale.ROOT))));
+                }
+            }
         }
     }
 
@@ -201,9 +212,6 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
                 value = Boolean.toString(parsed);
             }
             if (saved) {
-                if (booleanKey != null) {
-                    activeGame.configurationChanged(booleanKey);
-                }
                 language.send(sender, "config.saved", Map.of(
                         "key", language.text(sender, "config.name." + requested), "value", value));
             } else {
@@ -267,9 +275,10 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         boolean admin = CommandAccessPolicy.adminAllowed(sender.hasPermission(ADMIN_PERMISSION));
         List<String> candidates = new ArrayList<>();
         if (args.length == 1) {
-            if (sender instanceof Player) candidates.add("join");
+            if (sender instanceof Player && !gameManager.teamSelections().forcedRandom()) candidates.add("join");
             if (admin) candidates.addAll(List.of("start", "status", "stop", "config"));
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("join") && sender instanceof Player) {
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("join") && sender instanceof Player
+                && !gameManager.teamSelections().forcedRandom()) {
             candidates.addAll(List.of("hunter", "runner", "random"));
         } else if (!admin) {
             return List.of();

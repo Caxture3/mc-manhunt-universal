@@ -1,6 +1,7 @@
 package com.caxture.randomanhunt.runtime;
 
 import com.caxture.randomanhunt.config.ConfigurationService;
+import com.caxture.randomanhunt.config.BooleanConfigKey;
 import com.caxture.randomanhunt.config.TrackingSettings;
 import com.caxture.randomanhunt.game.CountdownSequence;
 import com.caxture.randomanhunt.game.CountdownStep;
@@ -258,7 +259,16 @@ public final class ActiveGameCoordinator {
         tracking.playerTeleported(player, from, to);
     }
 
-    public void configurationChanged(com.caxture.randomanhunt.config.BooleanConfigKey key) {
+    public void configurationChanged(BooleanConfigKey key) {
+        if (key == BooleanConfigKey.FORCE_RANDOM_ROLES) {
+            gameManager.teamSelections().setForcedRandom(configuration.get(key));
+        } else if (key == BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS) {
+            boolean hidden = configuration.get(key);
+            identity.setHidden(hidden);
+            if (!hidden && gameManager.activeSession().filter(s -> s.state() != SessionState.COUNTDOWN).isEmpty()) {
+                gameManager.teamSelections().snapshot().forEach(identity::updateLobbyChoice);
+            }
+        }
         tracking.configurationChanged(key);
     }
 

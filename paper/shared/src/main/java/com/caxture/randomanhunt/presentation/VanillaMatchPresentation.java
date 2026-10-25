@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 public final class VanillaMatchPresentation implements MatchPresentation {
     private static final Title.Times SHORT_TITLE = Title.Times.times(
@@ -27,10 +28,12 @@ public final class VanillaMatchPresentation implements MatchPresentation {
 
     private final Server server;
     private final LanguageService language;
+    private final BooleanSupplier hideRoles;
 
-    public VanillaMatchPresentation(Server server, LanguageService language) {
+    public VanillaMatchPresentation(Server server, LanguageService language, BooleanSupplier hideRoles) {
         this.server = server;
         this.language = language;
+        this.hideRoles = hideRoles;
     }
 
     @Override
@@ -45,8 +48,10 @@ public final class VanillaMatchPresentation implements MatchPresentation {
 
     @Override
     public void showStart(GameSession session) {
-        broadcast("game.start.runners", Map.of(
-                "players", MatchTextFormatter.names(session.participants(), session.runnerIds())));
+        if (!hideRoles.getAsBoolean()) {
+            broadcast("game.start.runners", Map.of(
+                    "players", MatchTextFormatter.names(session.participants(), session.runnerIds())));
+        }
         forEachOnlineParticipant(session.participants(), player -> {
             Role role = session.roleOf(player.getUniqueId()).orElseThrow();
             player.showTitle(Title.title(
@@ -68,10 +73,12 @@ public final class VanillaMatchPresentation implements MatchPresentation {
         language.send(recipient, "game.status.running", Map.of(
                 "count", Integer.toString(session.participants().size()),
                 "elapsed", MatchTextFormatter.elapsed(session.startedAt().orElseThrow(), now)));
-        language.send(recipient, "game.status.runners", Map.of(
-                "players", MatchTextFormatter.names(session.participants(), session.runnerIds())));
-        language.send(recipient, "game.status.hunters", Map.of(
-                "players", MatchTextFormatter.names(session.participants(), session.hunterIds())));
+        if (!hideRoles.getAsBoolean()) {
+            language.send(recipient, "game.status.runners", Map.of(
+                    "players", MatchTextFormatter.names(session.participants(), session.runnerIds())));
+            language.send(recipient, "game.status.hunters", Map.of(
+                    "players", MatchTextFormatter.names(session.participants(), session.hunterIds())));
+        }
         language.send(recipient, "game.status.surviving-runners", Map.of(
                 "alive", Integer.toString(session.livingRunnerIds().size()),
                 "total", Integer.toString(session.runnerIds().size())));
@@ -97,7 +104,7 @@ public final class VanillaMatchPresentation implements MatchPresentation {
             ResultReportComposer.Report report = ResultReportComposer.compose(
                     result,
                     (key, placeholders) -> language.text(recipient, key, placeholders),
-                    id -> participantName(result.participants(), id));
+                    id -> participantName(result.participants(), id), hideRoles.getAsBoolean());
             language.send(recipient, report.languageKey(), report.placeholders());
         });
     }

@@ -12,6 +12,15 @@ final class ResultReportComposer {
     }
 
     static Report compose(GameResult result, Localizer localizer, Function<UUID, String> nameLookup) {
+        return compose(result, localizer, nameLookup, false);
+    }
+
+    static Report compose(GameResult result, Localizer localizer, Function<UUID, String> nameLookup, boolean hideRoles) {
+        if (hideRoles) {
+            return new Report("game.result.hidden-report", Map.of(
+                    "winner", localizer.text(winnerKey(result.winner()), Map.of()),
+                    "reason", localizer.text(resultReasonKey(result.reason()), Map.of())));
+        }
         String killerSection = result.killer()
                 .map(killer -> localizer.text("game.result.killer-section", Map.of(
                         "player", nameLookup.apply(killer))))

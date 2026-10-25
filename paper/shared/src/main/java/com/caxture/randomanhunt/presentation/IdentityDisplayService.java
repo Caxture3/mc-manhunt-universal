@@ -26,6 +26,8 @@ public final class IdentityDisplayService {
     private Team hunterTeam;
     private Team lobbyRunnerTeam;
     private Team lobbyHunterTeam;
+    private boolean hidden;
+    private GameSession displayedSession;
 
     public IdentityDisplayService(Server server) {
         this.server = server;
@@ -34,6 +36,11 @@ public final class IdentityDisplayService {
     public void begin(GameSession session) {
         // Formal snapshots must describe the display before lobby selection, never its preview.
         clearLobbyPreviews();
+        displayedSession = session;
+        if (!hidden) beginVisible(session);
+    }
+
+    private void beginVisible(GameSession session) {
         Scoreboard scoreboard = server.getScoreboardManager().getMainScoreboard();
         String suffix = session.id().toString().substring(0, 8);
         runnerTeam = replaceTeam(scoreboard, "rmh_r_" + suffix, NamedTextColor.RED);
@@ -51,6 +58,7 @@ public final class IdentityDisplayService {
     }
 
     public void applyJoiningPlayer(GameSession session, Player player) {
+        if (hidden) return;
         Role role = session.roleOf(player.getUniqueId()).orElse(null);
         if (role == null) {
             return;
@@ -63,6 +71,11 @@ public final class IdentityDisplayService {
     public void clear(GameSession session) {
         // A cancelled countdown has previews, but no formal identity state yet.
         clearLobbyPreviews();
+        clearFormal(session);
+        if (displayedSession != null && displayedSession.id().equals(session.id())) displayedSession = null;
+    }
+
+    private void clearFormal(GameSession session) {
         Map<UUID, IdentityDisplayState.OriginalDisplay> originals = state.finish(session.id());
         Scoreboard scoreboard = server.getScoreboardManager().getMainScoreboard();
         for (Participant participant : session.participants()) {
@@ -99,7 +112,7 @@ public final class IdentityDisplayService {
     }
 
     public void updateLobbyChoice(UUID playerId, TeamPreference preference) {
-        if (preference == TeamPreference.RANDOM) {
+        if (hidden || preference == TeamPreference.RANDOM) {
             restoreLobbyPreview(playerId);
             return;
         }
@@ -124,6 +137,17 @@ public final class IdentityDisplayService {
 
     public void clearLobbyPreviews() {
         List.copyOf(lobbyOriginals.keySet()).forEach(this::restoreLobbyPreview);
+    }
+
+    public void setHidden(boolean hidden) {
+        if (this.hidden == hidden) return;
+        this.hidden = hidden;
+        if (hidden) {
+            clearLobbyPreviews();
+            if (displayedSession != null) clearFormal(displayedSession);
+        } else if (displayedSession != null) {
+            beginVisible(displayedSession);
+        }
     }
 
     private void restoreLobbyPreview(UUID playerId) {
