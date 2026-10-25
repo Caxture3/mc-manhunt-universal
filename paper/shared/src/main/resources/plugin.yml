@@ -1,6 +1,6 @@
 name: ManhuntUniversal
 version: '${version}'
-main: com.caxture.randomanhunt.RandoManhuntPlugin
+main: com.caxture.manhuntuniversal.ManhuntUniversalPlugin
 api-version: '${minecraft_version}'
 description: Multi-version Manhunt with fixed roles and companion client UI.
 commands:

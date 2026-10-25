@@ -115,7 +115,7 @@ docs/                   使用说明、设计与验证记录
 
 Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版本客户端的 `mods/`，并安装 Fabric Loader 和对应版本 Fabric API。不要安装 `-sources.jar` 或 `-dev.jar`，也不需要单独安装 `common`、`protocol` JAR。
 
-这四个产物分别面向对应游戏版本。插件和模组显示名为 `ManhuntUniversal`；为保留兼容性，源码包仍为 `com.caxture.randomanhunt`，Fabric Mod ID、资源命名空间、协议频道和绑定指南针 PDC 命名空间均保留 `randomanhunt`。配套模组与旧模组使用相同 Mod ID，客户端只安装对应的一份。
+这四个产物分别面向对应游戏版本。插件和模组显示名为 `ManhuntUniversal`，Java 根包为 `com.caxture.manhuntuniversal`。Fabric Mod ID、资源命名空间、协议频道和绑定指南针 PDC 命名空间继续保留兼容标识 `randomanhunt`；管理权限为 `randomanhunt.admin`。客户端只安装对应版本的一份配套模组。
 
 聊天前缀按客户端语言显示为 `穹猎追杀` / `Manhunt Universal`。升级不会自动改写 `plugins/ManhuntUniversal/lang/` 下的旧语言文件；已有服务器请按 [语言更新说明](docs/lobby-config.md) 手动更新相关条目。
 

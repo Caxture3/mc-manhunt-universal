@@ -8,7 +8,7 @@ Paper 的配置与双语文本基础设施、权限与管理命令、参与者�
 
 Fabric 保留原三栏 UI 的布局、中央裁切、图文透明度、双语名称、点击/重复选择/关闭行为、声音，以及全部图片、语言、shader 资源。26.3 实现保持原样；1.21.11 仅处理版本 API 差异。
 
-保留 `/rmh`、`randomanhunt.admin`、`com.caxture.randomanhunt` 和 `randomanhunt` 协议、资源及物品标记命名空间。协议模块的 11 个源文件逐字节保持一致。插件/模组显示名和外部 JAR 名称为 ManhuntUniversal；插件数据目录为 `plugins/ManhuntUniversal`。
+迁移初版保留了原命令、Java 包、权限及通信标识，协议模块最初逐字节复制。后续按用户要求，命令改为 `/mhu`，Java 根包改为 `com.caxture.manhuntuniversal`，入口类改为 `ManhuntUniversalPlugin` / `ManhuntUniversalClient`。协议编码、`randomanhunt.admin`、Fabric Mod ID、`randomanhunt` 协议/资源/PDC 命名空间继续兼容。插件/模组显示名和外部 JAR 名称为 ManhuntUniversal；插件数据目录为 `plugins/ManhuntUniversal`。
 
 ## 排除范围
 

@@ -17,7 +17,7 @@
 - 依赖坐标统一放在 `gradle/libs.versions.toml`。1.21.11 模块编译为 Java 21，26.3 模块编译为 Java 25。
 - Fabric 1.21.11 使用 remap Loom 和 Mojang mappings；26.3 使用非 remap Loom。两者必须独立验证。
 - 修改构建后执行 Gradle 构建并检查产物；实际游戏运行验证与编译验证分别记录，不得混称。
-- 构建产物名称保持 `manhunt-universal-*`。命令为 `/mhu`，无 `/rmh` 别名；未强制随机时 join 对所有玩家开放，其他子命令沿用 `randomanhunt.admin`。源码包及 `randomanhunt` 协议/资源/PDC 命名空间保留。
+- 构建产物名称保持 `manhunt-universal-*`。命令为 `/mhu`，无 `/rmh` 别名；未强制随机时 join 对所有玩家开放，其他子命令沿用 `randomanhunt.admin`。用户后续指定 Java 根包为 `com.caxture.manhuntuniversal`；`randomanhunt` 仅继续用作协议/资源/PDC 命名空间及 Mod ID 等兼容标识。
 - 本地化前缀为英文 `Manhunt Universal`、中文 `穹猎追杀`。结算文本不再生成或展示轮次历史，内部历史结构保留。
 - 配置列表显示本地化名称，hover 显示内部键；布尔点击实时检查权限和当前值，数值点击预填带末尾空格的 `/mhu config <key> `。
 - 不自动修改服务器上已有的外部语言文件；新默认文本和键仅写入仓库内置资源，并提供手动更新说明。
