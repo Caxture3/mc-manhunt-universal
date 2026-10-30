@@ -1,5 +1,6 @@
 package com.caxture.manhuntuniversal.client;
 
+import com.caxture.manhuntuniversal.protocol.TrackingAvailability;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionTarget;
 import org.bukkit.entity.Player;
 
@@ -9,7 +10,10 @@ public interface TrackingClientPublisher {
     boolean supportsCompatibleClient(UUID playerId);
 
     void openTrackingSelection(Player player, UUID sessionId, long authorizationId,
-                               TrackingSelectionTarget currentSelection);
+                               TrackingSelectionTarget currentSelection, TrackingAvailability availability);
+
+    void updateTrackingSelection(Player player, UUID sessionId, long authorizationId,
+                                 TrackingSelectionTarget currentSelection, TrackingAvailability availability);
 
     void closeTrackingSelection(Player player, UUID sessionId, long authorizationId);
 }

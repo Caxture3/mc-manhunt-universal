@@ -22,6 +22,7 @@ public final class ConfigurationService {
     private ConfigurationValues values;
     private IntConsumer runnerCountChanged = ignored -> {};
     private Consumer<BooleanConfigKey> booleanChanged = ignored -> {};
+    private Runnable structureUnlockTimesChanged = () -> {};
 
     public ConfigurationService(JavaPlugin plugin) {
         this(plugin, new AtomicFileWriter());
@@ -78,6 +79,7 @@ public final class ConfigurationService {
         }
         values = updated;
         if (key == IntConfigKey.RUNNER_COUNT) runnerCountChanged.accept(value);
+        if (key.structureUnlockTime()) structureUnlockTimesChanged.run();
         return true;
     }
 
@@ -100,6 +102,10 @@ public final class ConfigurationService {
 
     public synchronized void onBooleanChanged(Consumer<BooleanConfigKey> listener) {
         booleanChanged = Objects.requireNonNull(listener);
+    }
+
+    public synchronized void onStructureUnlockTimesChanged(Runnable listener) {
+        structureUnlockTimesChanged = Objects.requireNonNull(listener);
     }
 
     private ConfigurationValues load() {

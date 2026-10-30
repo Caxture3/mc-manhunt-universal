@@ -32,6 +32,10 @@ public final class TrackingSelectionAuthorizationRegistry {
         return true;
     }
 
+    public Optional<Authorization> current(UUID playerId) {
+        return Optional.ofNullable(current.get(playerId));
+    }
+
     public Optional<Authorization> invalidate(UUID playerId) {
         return Optional.ofNullable(current.remove(playerId));
     }

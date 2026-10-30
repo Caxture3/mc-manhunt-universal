@@ -10,6 +10,7 @@ import com.caxture.manhuntuniversal.protocol.TrackingSelectionChoose;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionClose;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionOpen;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionTarget;
+import com.caxture.manhuntuniversal.protocol.TrackingSelectionUpdate;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -64,25 +65,41 @@ public final class ClientProtocolController {
     private void receive(MainChannelPayload payload) {
         try {
             ProtocolMessage message = ProtocolCodec.decode(payload.data());
-            switch (message) {
-                case ServerHello hello -> acceptServerHello(hello);
-                case TrackingSelectionOpen open -> {
-                    if (compatible && open.protocolVersion() == ProtocolConstants.VERSION) {
-                        openSelector(open);
-                    }
+            var connection = minecraft.getConnection();
+            minecraft.execute(() -> {
+                if (connection != null && minecraft.getConnection() == connection) {
+                    handleMessage(message);
                 }
-                case TrackingSelectionClose close -> {
-                    if (compatible && close.protocolVersion() == ProtocolConstants.VERSION) {
-                        closeSelector(close.sessionId(), close.authorizationId());
-                    }
-                }
-                case ClientHello ignored -> logger.warn(
-                        "Received an unexpected CLIENT_HELLO from the server");
-                case TrackingSelectionChoose ignored -> logger.warn(
-                        "Received an unexpected TRACKING_SELECTION_CHOOSE from the server");
-            }
+            });
         } catch (IllegalArgumentException exception) {
             logger.warn("Ignored malformed RandoManhunt payload", exception);
+        }
+    }
+
+    private void handleMessage(ProtocolMessage message) {
+        switch (message) {
+            case ServerHello hello -> acceptServerHello(hello);
+            case TrackingSelectionOpen open -> {
+                if (compatible && open.protocolVersion() == ProtocolConstants.VERSION) {
+                    openSelector(open);
+                }
+            }
+            case TrackingSelectionClose close -> {
+                if (compatible && close.protocolVersion() == ProtocolConstants.VERSION) {
+                    closeSelector(close.sessionId(), close.authorizationId());
+                }
+            }
+            case TrackingSelectionUpdate update -> {
+                if (compatible && update.protocolVersion() == ProtocolConstants.VERSION
+                        && minecraft.screen instanceof CompassTrackingSelectionScreen selector
+                        && selector.matches(update.sessionId(), update.authorizationId())) {
+                    selector.update(update);
+                }
+            }
+            case ClientHello ignored -> logger.warn(
+                    "Received an unexpected CLIENT_HELLO from the server");
+            case TrackingSelectionChoose ignored -> logger.warn(
+                    "Received an unexpected TRACKING_SELECTION_CHOOSE from the server");
         }
     }
 
@@ -105,9 +122,20 @@ public final class ClientProtocolController {
     }
 
     private void openSelector(TrackingSelectionOpen request) {
-        minecraft.execute(() -> minecraft.setScreenAndShow(
-                new CompassTrackingSelectionScreen(request,
-                        selected -> sendSelection(request, selected))));
+        if (!request.availability().hasVisibleOptions()) {
+            closeSelector(request.sessionId(), request.authorizationId());
+            return;
+        }
+        minecraft.setScreenAndShow(new CompassTrackingSelectionScreen(request,
+                selected -> sendSelection(request, selected), () -> sendCancellation(request)));
+    }
+
+    private void sendCancellation(TrackingSelectionOpen request) {
+        if (compatible && ClientPlayNetworking.canSend(MainChannelPayload.TYPE)) {
+            ClientPlayNetworking.send(new MainChannelPayload(ProtocolCodec.encode(
+                    new TrackingSelectionClose(ProtocolConstants.VERSION,
+                            request.sessionId(), request.authorizationId()))));
+        }
     }
 
     private void sendSelection(TrackingSelectionOpen request,
@@ -124,19 +152,19 @@ public final class ClientProtocolController {
     }
 
     private void closeSelector(UUID sessionId, long authorizationId) {
-        minecraft.execute(() -> {
-            if (minecraft.screen instanceof CompassTrackingSelectionScreen selector
-                    && selector.matches(sessionId, authorizationId)) {
-                minecraft.setScreenAndShow(null);
-            }
-        });
+        if (minecraft.screen instanceof CompassTrackingSelectionScreen selector
+                && selector.matches(sessionId, authorizationId)) {
+            selector.closeFromServer();
+        }
     }
 
     private void closeAnySelector() {
-        minecraft.execute(() -> {
-            if (minecraft.screen instanceof CompassTrackingSelectionScreen) {
-                minecraft.setScreenAndShow(null);
-            }
-        });
+        if (minecraft.screen instanceof CompassTrackingSelectionScreen selector) {
+            minecraft.execute(() -> {
+                if (minecraft.screen == selector) {
+                    selector.closeFromServer();
+                }
+            });
+        }
     }
 }

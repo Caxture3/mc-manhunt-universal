@@ -46,6 +46,8 @@ game:
       §b猎人§6：§f{hunters}
     killer-section: "§6 击杀者：§f{player}"
 config:
+  map-start: "§7- §e{key}§7 = {"
+  structure-unlock-usage: "{prefix}§e用法：/mhu config runner-structure-tracker-unlock-time.<village|bastion_remnant|nether_fortress> <秒数，-1 禁用>"
   header: "{prefix}§f配置项："
   entry: "§7- §e{key}§7 ： §f{value}"
   unknown: "{prefix}§c未知配置项：{key}"
@@ -58,6 +60,11 @@ config:
   save-failed: "{prefix}§c配置保存失败，原值未改变。"
   usage: "{prefix}§e用法：/mhu config [配置项] [数值]"
   name:
+    runner-structure-tracker-unlock-time:
+      title: "速通者结构追踪解锁时间（秒）"
+      village: "村庄解锁时间（秒）"
+      bastion_remnant: "堡垒遗迹解锁时间（秒）"
+      nether_fortress: "下界堡垒解锁时间（秒）"
     force-random-roles: "强制随机分配角色"
     hide-role-assignments: "隐藏角色分配"
     ore-fortune-level: "矿物爆率等级 (0~5)"
@@ -128,11 +135,13 @@ tracking:
     lore-bound: "§c对局物品：不可丢弃或放入容器"
     no-space: "{prefix}§c请腾出一个背包格以接收追踪指南针。"
   dialog:
+    locked-tooltip: "§7将在 {time} 后解锁，当前不可选择"
     title: "§6选择追踪目标"
     button: "§f{target}"
     button-selected: "§a✓ {target}"
     tooltip: "§7再次选择当前目标可停止追踪"
   selection:
+    unlocked: "{prefix}§a已解锁追踪目标：[§e{target}§a]"
     changed: "{prefix}§a追踪目标已切换为：{target}。"
     cleared: "{prefix}§e已停止追踪。"
   actionbar:

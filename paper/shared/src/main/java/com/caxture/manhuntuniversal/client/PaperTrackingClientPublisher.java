@@ -10,6 +10,8 @@ import com.caxture.manhuntuniversal.protocol.TrackingSelectionChoose;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionClose;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionOpen;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionTarget;
+import com.caxture.manhuntuniversal.protocol.TrackingSelectionUpdate;
+import com.caxture.manhuntuniversal.protocol.TrackingAvailability;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -28,6 +30,8 @@ public final class PaperTrackingClientPublisher
     private final ClientCapabilityRegistry capabilities = new ClientCapabilityRegistry();
     private BiConsumer<Player, TrackingSelectionChoose> selectionHandler =
             (ignoredPlayer, ignoredChoice) -> { };
+    private BiConsumer<Player, TrackingSelectionClose> closeHandler =
+            (ignoredPlayer, ignoredClose) -> { };
 
     public PaperTrackingClientPublisher(JavaPlugin plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -42,6 +46,10 @@ public final class PaperTrackingClientPublisher
         this.selectionHandler = Objects.requireNonNull(selectionHandler, "selectionHandler");
     }
 
+    public void setCloseHandler(BiConsumer<Player, TrackingSelectionClose> closeHandler) {
+        this.closeHandler = Objects.requireNonNull(closeHandler, "closeHandler");
+    }
+
     @Override
     public boolean supportsCompatibleClient(UUID playerId) {
         return capabilities.supports(playerId);
@@ -52,14 +60,26 @@ public final class PaperTrackingClientPublisher
             Player player,
             UUID sessionId,
             long authorizationId,
-            TrackingSelectionTarget currentSelection
+            TrackingSelectionTarget currentSelection,
+            TrackingAvailability availability
     ) {
         if (capabilities.supports(player.getUniqueId())) {
             send(player, new TrackingSelectionOpen(
                     ProtocolConstants.VERSION,
                     sessionId,
                     authorizationId,
-                    currentSelection));
+                    currentSelection,
+                    availability));
+        }
+    }
+
+    @Override
+    public void updateTrackingSelection(Player player, UUID sessionId, long authorizationId,
+                                        TrackingSelectionTarget currentSelection,
+                                        TrackingAvailability availability) {
+        if (capabilities.supports(player.getUniqueId())) {
+            send(player, new TrackingSelectionUpdate(ProtocolConstants.VERSION,
+                    sessionId, authorizationId, currentSelection, availability));
         }
     }
 
@@ -89,6 +109,10 @@ public final class PaperTrackingClientPublisher
                     && capabilities.supports(player.getUniqueId())
                     && choice.protocolVersion() == ProtocolConstants.VERSION) {
                 selectionHandler.accept(player, choice);
+            } else if (decoded instanceof TrackingSelectionClose close
+                    && capabilities.supports(player.getUniqueId())
+                    && close.protocolVersion() == ProtocolConstants.VERSION) {
+                closeHandler.accept(player, close);
             } else {
                 plugin.getLogger().warning(
                         "Ignoring unexpected client message from " + player.getName());

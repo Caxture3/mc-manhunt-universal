@@ -28,6 +28,12 @@ final class TrackingSearchQueue {
         entries.removeIf(entry -> entry.request().key().playerId().equals(playerId));
     }
 
+    void invalidate(UUID playerId, Lane lane) {
+        Key key = new Key(playerId, lane);
+        currentVersions.remove(key);
+        entries.removeIf(entry -> entry.request().key().equals(key));
+    }
+
     boolean runOne() {
         Entry entry;
         while ((entry = entries.pollFirst()) != null) {

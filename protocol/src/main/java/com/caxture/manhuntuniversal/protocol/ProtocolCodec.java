@@ -14,6 +14,7 @@ public final class ProtocolCodec {
     private static final int TRACKING_SELECTION_OPEN = 3;
     private static final int TRACKING_SELECTION_CHOOSE = 4;
     private static final int TRACKING_SELECTION_CLOSE = 5;
+    private static final int TRACKING_SELECTION_UPDATE = 6;
 
     private ProtocolCodec() {
     }
@@ -38,6 +39,15 @@ public final class ProtocolCodec {
                         writeUuid(output, open.sessionId());
                         output.writeLong(open.authorizationId());
                         output.writeByte(open.currentSelection().wireId());
+                        writeAvailability(output, open.availability());
+                    }
+                    case TrackingSelectionUpdate update -> {
+                        output.writeByte(TRACKING_SELECTION_UPDATE);
+                        output.writeInt(update.protocolVersion());
+                        writeUuid(output, update.sessionId());
+                        output.writeLong(update.authorizationId());
+                        output.writeByte(update.currentSelection().wireId());
+                        writeAvailability(output, update.availability());
                     }
                     case TrackingSelectionChoose choose -> {
                         output.writeByte(TRACKING_SELECTION_CHOOSE);
@@ -77,7 +87,12 @@ public final class ProtocolCodec {
                         input.readInt(), input.readBoolean());
                 case TRACKING_SELECTION_OPEN -> new TrackingSelectionOpen(
                         input.readInt(), readUuid(input), input.readLong(),
-                        TrackingSelectionTarget.fromWireId(input.readUnsignedByte()));
+                        TrackingSelectionTarget.fromWireId(input.readUnsignedByte()),
+                        readAvailability(input));
+                case TRACKING_SELECTION_UPDATE -> new TrackingSelectionUpdate(
+                        input.readInt(), readUuid(input), input.readLong(),
+                        TrackingSelectionTarget.fromWireId(input.readUnsignedByte()),
+                        readAvailability(input));
                 case TRACKING_SELECTION_CHOOSE -> new TrackingSelectionChoose(
                         input.readInt(), readUuid(input), input.readLong(),
                         TrackingSelectionTarget.fromWireId(input.readUnsignedByte()));
@@ -104,6 +119,17 @@ public final class ProtocolCodec {
     private static void writeUuid(DataOutputStream output, UUID value) throws IOException {
         output.writeLong(value.getMostSignificantBits());
         output.writeLong(value.getLeastSignificantBits());
+    }
+
+    private static void writeAvailability(DataOutputStream output, TrackingAvailability value)
+            throws IOException {
+        output.writeLong(value.villageMillis());
+        output.writeLong(value.netherFortressMillis());
+        output.writeLong(value.bastionRemnantMillis());
+    }
+
+    private static TrackingAvailability readAvailability(DataInputStream input) throws IOException {
+        return new TrackingAvailability(input.readLong(), input.readLong(), input.readLong());
     }
 
     private static UUID readUuid(DataInputStream input) throws IOException {

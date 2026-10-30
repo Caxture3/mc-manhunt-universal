@@ -88,6 +88,9 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
                         choice.sessionId(),
                         choice.authorizationId(),
                         TrackingSelectionTargetMapper.fromProtocol(choice.selection())));
+        clientPublisher.setCloseHandler((player, close) ->
+                tracking.cancelRunnerSelection(player, close.sessionId(), close.authorizationId()));
+        configuration.onStructureUnlockTimesChanged(tracking::structureUnlockTimesChanged);
         getServer().getOnlinePlayers().forEach(tracking::cleanupStale);
 
         activeGame = new ActiveGameCoordinator(

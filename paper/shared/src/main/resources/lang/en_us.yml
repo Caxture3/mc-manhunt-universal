@@ -46,6 +46,8 @@ game:
       §bHunters§6: §f{hunters}
     killer-section: " by §b{player}"
 config:
+  map-start: "§7- §e{key}§7 = {"
+  structure-unlock-usage: "{prefix}§eUsage: /mhu config runner-structure-tracker-unlock-time.<village|bastion_remnant|nether_fortress> <seconds, -1 disables>"
   header: "{prefix}§fConfiguration:"
   entry: "§7- §e{key}§7 = §f{value}"
   unknown: "{prefix}§cUnknown configuration key: {key}"
@@ -58,6 +60,11 @@ config:
   save-failed: "{prefix}§cCould not save the configuration; the previous value remains active."
   usage: "{prefix}§eUsage: /mhu config [key] [value]"
   name:
+    runner-structure-tracker-unlock-time:
+      title: "Runner structure tracker unlock times (seconds)"
+      village: "Village unlock time (seconds)"
+      bastion_remnant: "Bastion remnant unlock time (seconds)"
+      nether_fortress: "Nether fortress unlock time (seconds)"
     force-random-roles: "Force random role assignment"
     hide-role-assignments: "Hide role assignments"
     ore-fortune-level: "Virtual ore Fortune level"
@@ -128,11 +135,13 @@ tracking:
     lore-bound: "§cGame item: cannot be dropped or stored in containers"
     no-space: "{prefix}§cFree an inventory slot to receive your tracking compass."
   dialog:
+    locked-tooltip: "§7Unlocks in {time}; selection is currently disabled"
     title: "§6Choose Tracking Target"
     button: "§f{target}"
     button-selected: "§a✓ {target}"
     tooltip: "§7Choose the current target again to stop tracking"
   selection:
+    unlocked: "{prefix}§aTracking target unlocked: [§e{target}§a]"
     changed: "{prefix}§aTracking target changed to {target}."
     cleared: "{prefix}§eTracking stopped."
   actionbar:

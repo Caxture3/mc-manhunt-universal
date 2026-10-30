@@ -2,6 +2,10 @@ runner-count: 1
 force-random-roles: false
 hide-role-assignments: false
 runner-compass-enabled: true
+runner-structure-tracker-unlock-time:
+  village: 0
+  bastion_remnant: 0
+  nether_fortress: 0
 hunter-compass-enabled: true
 reset-players-at-start: true
 show-chat-prefix: true

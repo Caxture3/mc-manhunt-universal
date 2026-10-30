@@ -2,6 +2,10 @@ package com.caxture.manhuntuniversal.fabric.ui;
 
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionOpen;
 import com.caxture.manhuntuniversal.protocol.TrackingSelectionTarget;
+import com.caxture.manhuntuniversal.protocol.TrackingSelectionUpdate;
+import com.caxture.manhuntuniversal.protocol.TrackingAvailability;
+import com.caxture.manhuntuniversal.common.CountdownText;
+import com.mojang.blaze3d.platform.cursor.CursorTypes;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -19,46 +23,64 @@ import java.util.function.Consumer;
 public final class CompassTrackingSelectionScreen extends Screen {
     private final UUID sessionId;
     private final long authorizationId;
-    private final TrackingSelectionTarget currentSelection;
+    private TrackingSelectionTarget currentSelection;
     private final Consumer<TrackingSelectionTarget> selectionHandler;
+    private final Runnable cancelHandler;
+    private final TrackingAvailabilityClock availabilityClock;
+    private boolean completed;
 
     public CompassTrackingSelectionScreen(TrackingSelectionOpen request,
-                                          Consumer<TrackingSelectionTarget> selectionHandler) {
+                                          Consumer<TrackingSelectionTarget> selectionHandler,
+                                          Runnable cancelHandler) {
         super(Component.translatable(CompassSelectorLanguage.titleKey(
                 Minecraft.getInstance().getLanguageManager().getSelected())));
         this.sessionId = request.sessionId();
         this.authorizationId = request.authorizationId();
         this.currentSelection = request.currentSelection();
         this.selectionHandler = Objects.requireNonNull(selectionHandler, "selectionHandler");
+        this.cancelHandler = Objects.requireNonNull(cancelHandler, "cancelHandler");
+        this.availabilityClock = new TrackingAvailabilityClock(request.availability(), System.nanoTime());
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY,
                                    float partialTick) {
         renderTransparentBackground(graphics);
-        CompassSelectorLayout layout = CompassSelectorLayout.fit(width, height);
+        TrackingAvailability availability = availabilityClock.at(System.nanoTime());
+        CompassSelectorLayout layout = CompassSelectorLayout.fit(width, height, availability);
         int hovered = layout.panelAt(mouseX, mouseY).orElse(-1);
-        int selected = currentSelection == TrackingSelectionTarget.NONE
-                ? -1 : CompassSelectorOption.fromTarget(currentSelection).ordinal();
+        int selected = -1;
+        for (int index = 0; index < layout.panelCount(); index++) {
+            if (layout.option(index).target() == currentSelection) {
+                selected = index;
+            }
+        }
 
-        for (CompassSelectorOption option : CompassSelectorOption.values()) {
-            int index = option.ordinal();
-            float opacity = CompassSelectorLayout.opacity(index, selected, hovered);
-            renderPanel(graphics, layout.panel(index), option, opacity);
+        for (int index = 0; index < layout.panelCount(); index++) {
+            CompassSelectorOption option = layout.option(index);
+            boolean unlocked = availability.unlocked(option.target());
+            float opacity = CompassSelectorLayout.opacity(index, selected, hovered, unlocked);
+            renderPanel(graphics, layout, layout.panel(index), option, opacity,
+                    availability.remainingMillis(option.target()));
+            if (hovered == index && !unlocked && minecraft.options.allowCursorChanges().get()) {
+                graphics.requestCursor(CursorTypes.NOT_ALLOWED);
+            }
         }
         renderTitle(graphics, layout);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        CompassSelectorLayout layout = CompassSelectorLayout.fit(width, height);
+        TrackingAvailability availability = availabilityClock.at(System.nanoTime());
+        CompassSelectorLayout layout = CompassSelectorLayout.fit(width, height, availability);
         var selection = CompassSelectorInteraction.selectionAt(
                 layout,
                 (int) Math.floor(event.x()),
                 (int) Math.floor(event.y()),
                 event.button(),
-                currentSelection);
+                currentSelection, availability);
         if (selection.isPresent()) {
+            completed = true;
             CompassSelectorCommit.commit(
                     selection.orElseThrow(),
                     selectionHandler,
@@ -75,6 +97,31 @@ public final class CompassTrackingSelectionScreen extends Screen {
     }
 
     @Override
+    public void removed() {
+        if (!completed) {
+            completed = true;
+            cancelHandler.run();
+        }
+        super.removed();
+    }
+
+    public void closeFromServer() {
+        completed = true;
+        minecraft.setScreenAndShow(null);
+    }
+
+    public void update(TrackingSelectionUpdate update) {
+        if (completed || !matches(update.sessionId(), update.authorizationId())) {
+            return;
+        }
+        currentSelection = update.currentSelection();
+        availabilityClock.update(update.availability(), System.nanoTime());
+        if (!update.availability().hasVisibleOptions()) {
+            closeFromServer();
+        }
+    }
+
+    @Override
     public boolean isPauseScreen() {
         return false;
     }
@@ -83,9 +130,9 @@ public final class CompassTrackingSelectionScreen extends Screen {
         return sessionId.equals(expectedSessionId) && authorizationId == expectedAuthorizationId;
     }
 
-    private void renderPanel(GuiGraphics graphics, SelectorRect panel,
-                             CompassSelectorOption option, float opacity) {
-        SelectorRect crop = CompassSelectorLayout.SOURCE_CROP;
+    private void renderPanel(GuiGraphics graphics, CompassSelectorLayout layout, SelectorRect panel,
+                             CompassSelectorOption option, float opacity, long remainingMillis) {
+        SelectorRect crop = layout.sourceCrop();
         int textureColor = CompassSelectorColor.alphaWhite(opacity);
         int textColor = CompassSelectorColor.alphaWhite(opacity);
         Identifier texture = Identifier.fromNamespaceAndPath(
@@ -95,7 +142,7 @@ public final class CompassTrackingSelectionScreen extends Screen {
                 panel.width(), panel.height(), crop.width(), crop.height(),
                 2560, 1440, textureColor);
 
-        SelectorTypography typography = CompassSelectorLayout.fit(width, height).typography();
+        SelectorTypography typography = layout.typography();
         String baseKey = option.translationBaseKey();
         Component chinese = Component.translatable(baseKey + ".zh");
         int chineseScale = fittingScale(
@@ -117,6 +164,13 @@ public final class CompassTrackingSelectionScreen extends Screen {
             renderCenteredText(graphics, english[line], panel.x() + panel.width() / 2.0F,
                     englishY + line * font.lineHeight * englishScale,
                     englishScale, textColor);
+        }
+        if (remainingMillis > 0) {
+            int countdownScale = englishScale * 2;
+            renderCenteredText(graphics, Component.literal(CountdownText.format(remainingMillis)),
+                    panel.x() + panel.width() / 2.0F,
+                    panel.y() + (panel.height() - font.lineHeight * countdownScale) / 2.0F,
+                    countdownScale, 0xFFFFFFFF);
         }
     }
 

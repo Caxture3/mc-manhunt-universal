@@ -1,6 +1,7 @@
 package com.caxture.manhuntuniversal.tracking;
 
 import com.caxture.manhuntuniversal.client.TrackingClientPublisher;
+import com.caxture.manhuntuniversal.protocol.TrackingAvailability;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
@@ -29,7 +30,9 @@ public final class FabricAwareTrackingSelectionPresenter implements TrackingSele
             UUID sessionId,
             long authorizationId,
             TrackingTargetId currentSelection,
-            Consumer<TrackingTargetId> selectionHandler
+            TrackingAvailability availability,
+            Consumer<TrackingTargetId> selectionHandler,
+            Runnable dismiss
     ) {
         UUID playerId = player.getUniqueId();
         ActivePresentation previous = activePresentations.remove(playerId);
@@ -38,18 +41,42 @@ public final class FabricAwareTrackingSelectionPresenter implements TrackingSele
         }
         PresentationRoute route = clients.supportsCompatibleClient(playerId)
                 ? PresentationRoute.FABRIC : PresentationRoute.PAPER;
-        activePresentations.put(playerId,
-                new ActivePresentation(sessionId, authorizationId, route));
+        ActivePresentation presentation = new ActivePresentation(sessionId, authorizationId, route);
+        activePresentations.put(playerId, presentation);
         if (route == PresentationRoute.FABRIC) {
             clients.openTrackingSelection(
                     player,
                     sessionId,
                     authorizationId,
-                    TrackingSelectionTargetMapper.toProtocol(currentSelection));
+                    TrackingSelectionTargetMapper.toProtocol(currentSelection), availability);
             return;
         }
         fallback.show(
-                player, sessionId, authorizationId, currentSelection, selectionHandler);
+                player, sessionId, authorizationId, currentSelection, availability,
+                target -> {
+                    if (activePresentations.get(playerId) == presentation) selectionHandler.accept(target);
+                },
+                () -> {
+                    if (activePresentations.get(playerId) == presentation) {
+                        activePresentations.remove(playerId);
+                        // Send an ordered close after any refresh already in flight before releasing the capability.
+                        closeRoute(player, presentation);
+                        dismiss.run();
+                    }
+                });
+    }
+
+    @Override
+    public void update(Player player, UUID sessionId, long authorizationId,
+                       TrackingTargetId currentSelection, TrackingAvailability availability) {
+        ActivePresentation current = activePresentations.get(player.getUniqueId());
+        if (current == null || !current.matches(sessionId, authorizationId)) return;
+        if (current.route() == PresentationRoute.FABRIC) {
+            clients.updateTrackingSelection(player, sessionId, authorizationId,
+                    TrackingSelectionTargetMapper.toProtocol(currentSelection), availability);
+        } else {
+            fallback.update(player, sessionId, authorizationId, currentSelection, availability);
+        }
     }
 
     @Override
@@ -65,6 +92,7 @@ public final class FabricAwareTrackingSelectionPresenter implements TrackingSele
     @Override
     public void invalidate(UUID playerId) {
         activePresentations.remove(playerId);
+        fallback.invalidate(playerId);
     }
 
     private void closeRoute(Player player, ActivePresentation presentation) {

@@ -3,6 +3,7 @@ package com.caxture.manhuntuniversal.command;
 import com.caxture.manhuntuniversal.config.BooleanConfigKey;
 import com.caxture.manhuntuniversal.config.ConfigurationService;
 import com.caxture.manhuntuniversal.config.IntConfigKey;
+import com.caxture.manhuntuniversal.config.RunnerStructureUnlockTimes;
 import com.caxture.manhuntuniversal.game.GameManager;
 import com.caxture.manhuntuniversal.game.GameSession;
 import com.caxture.manhuntuniversal.game.TeamPreference;
@@ -28,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 public final class MhuCommand implements CommandExecutor, TabCompleter {
     public static final String ADMIN_PERMISSION = "randomanhunt.admin";
@@ -176,14 +178,21 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             language.send(sender, "config.header");
             for (IntConfigKey key : IntConfigKey.values()) {
+                if (key.structureUnlockTime()) continue;
                 sendConfigEntry(sender, key.configKey(), Integer.toString(configuration.get(key)));
             }
             for (BooleanConfigKey key : BooleanConfigKey.values()) {
                 sendConfigEntry(sender, key.configKey(), Boolean.toString(configuration.get(key)));
             }
+            sendStructureUnlockGroup(sender);
             return;
         }
         String requested = args[1].toLowerCase(Locale.ROOT);
+        if (requested.equals(RunnerStructureUnlockTimes.CONFIG_KEY)) {
+            if (args.length == 2) sendStructureUnlockGroup(sender);
+            else language.send(sender, "config.structure-unlock-usage");
+            return;
+        }
         IntConfigKey integerKey = IntConfigKey.find(requested).orElse(null);
         BooleanConfigKey booleanKey = BooleanConfigKey.find(requested).orElse(null);
         if (integerKey == null && booleanKey == null) {
@@ -275,6 +284,18 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(InteractiveMessages.configEntry(line, key, click));
     }
 
+    private void sendStructureUnlockGroup(CommandSender sender) {
+        String key = RunnerStructureUnlockTimes.CONFIG_KEY;
+        Component heading = language.chatComponent(sender, "config.map-start", Map.of(
+                "key", language.text(sender, "config.name." + key + ".title")));
+        RunnerStructureUnlockTimes times = configuration.values().runnerStructureUnlockTimes();
+        Map<String, String> entries = new LinkedHashMap<>();
+        entries.put("village", Integer.toString(times.village()));
+        entries.put("bastion_remnant", Integer.toString(times.bastionRemnant()));
+        entries.put("nether_fortress", Integer.toString(times.netherFortress()));
+        InteractiveMessages.configMap(heading, key, entries, sender instanceof Player).forEach(sender::sendMessage);
+    }
+
     @Override
     public List<String> onTabComplete(
             CommandSender sender,
@@ -295,11 +316,15 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         } else if (args.length == 2 && args[0].equalsIgnoreCase("start")) {
             candidates.addAll(List.of("5", "10", "30", "60"));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("config")) {
+            candidates.add(RunnerStructureUnlockTimes.CONFIG_KEY);
             Arrays.stream(IntConfigKey.values()).map(IntConfigKey::configKey).forEach(candidates::add);
             Arrays.stream(BooleanConfigKey.values()).map(BooleanConfigKey::configKey).forEach(candidates::add);
         } else if (args.length == 3 && args[0].equalsIgnoreCase("config")
                 && BooleanConfigKey.find(args[1].toLowerCase(Locale.ROOT)).isPresent()) {
             candidates.addAll(List.of("true", "false"));
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("config")
+                && IntConfigKey.find(args[1].toLowerCase(Locale.ROOT)).filter(IntConfigKey::structureUnlockTime).isPresent()) {
+            candidates.addAll(List.of("-1", "0", "120", "900", "1200"));
         }
         String prefix = args.length == 0 ? "" : args[args.length - 1].toLowerCase(Locale.ROOT);
         return candidates.stream().filter(value -> value.startsWith(prefix)).toList();

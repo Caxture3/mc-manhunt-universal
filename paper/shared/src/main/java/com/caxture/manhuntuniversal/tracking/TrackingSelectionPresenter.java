@@ -1,5 +1,6 @@
 package com.caxture.manhuntuniversal.tracking;
 
+import com.caxture.manhuntuniversal.protocol.TrackingAvailability;
 import org.bukkit.entity.Player;
 
 import java.util.UUID;
@@ -11,8 +12,13 @@ public interface TrackingSelectionPresenter {
             UUID sessionId,
             long authorizationId,
             TrackingTargetId currentSelection,
-            Consumer<TrackingTargetId> selectionHandler
+            TrackingAvailability availability,
+            Consumer<TrackingTargetId> selectionHandler,
+            Runnable dismiss
     );
+
+    void update(Player player, UUID sessionId, long authorizationId,
+                TrackingTargetId currentSelection, TrackingAvailability availability);
 
     void close(Player player, UUID sessionId, long authorizationId);
 

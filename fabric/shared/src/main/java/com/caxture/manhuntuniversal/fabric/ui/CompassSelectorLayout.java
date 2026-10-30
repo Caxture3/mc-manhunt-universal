@@ -1,19 +1,28 @@
 package com.caxture.manhuntuniversal.fabric.ui;
 
 import java.util.OptionalInt;
+import java.util.List;
+import java.util.Arrays;
+import com.caxture.manhuntuniversal.protocol.TrackingAvailability;
 
-/** Pure geometry for the 16:9, three-panel tracking selector. */
+/** Pure geometry for the 16:9 selector, with equal panels for visible options. */
 public final class CompassSelectorLayout {
     public static final SelectorRect SOURCE_CROP = new SelectorRect(853, 0, 854, 1440);
-    private static final int PANEL_COUNT = 3;
-
     private final SelectorRect canvas;
+    private final List<CompassSelectorOption> options;
 
-    private CompassSelectorLayout(SelectorRect canvas) {
+    private CompassSelectorLayout(SelectorRect canvas, TrackingAvailability availability) {
         this.canvas = canvas;
+        this.options = Arrays.stream(CompassSelectorOption.values())
+                .filter(option -> availability.visible(option.target())).toList();
     }
 
     public static CompassSelectorLayout fit(int screenWidth, int screenHeight) {
+        return fit(screenWidth, screenHeight, TrackingAvailability.allUnlocked());
+    }
+
+    public static CompassSelectorLayout fit(int screenWidth, int screenHeight,
+                                            TrackingAvailability availability) {
         if (screenWidth <= 0 || screenHeight <= 0) {
             throw new IllegalArgumentException("screen dimensions must be positive");
         }
@@ -30,7 +39,7 @@ public final class CompassSelectorLayout {
                 (screenWidth - contentWidth) / 2,
                 (screenHeight - contentHeight) / 2,
                 contentWidth,
-                contentHeight));
+                contentHeight), availability);
     }
 
     public SelectorRect canvas() {
@@ -38,22 +47,40 @@ public final class CompassSelectorLayout {
     }
 
     public SelectorRect panel(int index) {
-        if (index < 0 || index >= PANEL_COUNT) {
-            throw new IllegalArgumentException("panel index must be between 0 and 2");
+        if (index < 0 || index >= options.size()) {
+            throw new IllegalArgumentException("panel index must identify a visible option");
         }
-        int left = canvas.x() + (int) ((long) index * canvas.width() / PANEL_COUNT);
-        int right = canvas.x() + (int) ((long) (index + 1) * canvas.width() / PANEL_COUNT);
+        int left = canvas.x() + (int) ((long) index * canvas.width() / options.size());
+        int right = canvas.x() + (int) ((long) (index + 1) * canvas.width() / options.size());
         return new SelectorRect(left, canvas.y(), right - left, canvas.height());
     }
 
     public OptionalInt panelAt(int mouseX, int mouseY) {
-        if (!canvas.contains(mouseX, mouseY)) {
+        if (options.isEmpty() || !canvas.contains(mouseX, mouseY)) {
             return OptionalInt.empty();
         }
-        int relativeX = mouseX - canvas.x();
-        int index = Math.min(PANEL_COUNT - 1,
-                (int) ((long) relativeX * PANEL_COUNT / canvas.width()));
-        return OptionalInt.of(index);
+        for (int index = 0; index < options.size(); index++) {
+            if (panel(index).contains(mouseX, mouseY)) {
+                return OptionalInt.of(index);
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    public int panelCount() {
+        return options.size();
+    }
+
+    public CompassSelectorOption option(int index) {
+        return options.get(index);
+    }
+
+    public SelectorRect sourceCrop() {
+        if (options.size() == 3 || options.isEmpty()) {
+            return SOURCE_CROP;
+        }
+        int cropWidth = 2560 / options.size();
+        return new SelectorRect((2560 - cropWidth) / 2, 0, cropWidth, 1440);
     }
 
     public SelectorTypography typography() {
@@ -67,6 +94,10 @@ public final class CompassSelectorLayout {
     }
 
     public static float opacity(int panelIndex, int selectedIndex, int hoveredIndex) {
-        return panelIndex == selectedIndex || panelIndex == hoveredIndex ? 1.0f : 0.5f;
+        return opacity(panelIndex, selectedIndex, hoveredIndex, true);
+    }
+
+    public static float opacity(int panelIndex, int selectedIndex, int hoveredIndex, boolean unlocked) {
+        return unlocked && (panelIndex == selectedIndex || panelIndex == hoveredIndex) ? 1.0f : 0.5f;
     }
 }

@@ -30,6 +30,8 @@
 
 默认配置及服务端语言文件在 `plugins/ManhuntUniversal/`。原配置语义保持：`runner-count` 默认 1；两种指南针、聊天前缀和 `reset-players-at-start` 默认开启。开局重置会按旧实现清理参与者物品、状态、经验、进度并传送至出生点；可通过配置关闭。三个 `tracking-*` 参数在下一局生效。
 
+`runner-structure-tracker-unlock-time` 统一配置村庄、堡垒遗迹和下界堡垒的追踪解锁秒数，默认均为 `0`；`-1` 禁用对应结构，全禁用时不发速通者结构指南针。计时从正式开局开始，配置即时生效。例如 `/mhu config runner-structure-tracker-unlock-time.village 120`。禁用项隐藏，待解锁项显示倒计时并禁止选择，详见[结构追踪解锁说明](docs/structure-tracker-unlock.md)。
+
 `allow-blaze-spawner-break` 默认为 `false`，只在正式游戏 RUNNING 时禁止破坏普通烈焰人刷怪笼，包含 OP 和局外玩家。空闲、倒计时及结算后允许破坏；其他种类刷怪笼不受此规则影响。通过 `/mhu config allow-blaze-spawner-break true` 或点击配置项可即时允许破坏。
 
 三项可选优化默认关闭，可通过配置列表交互或以下命令开启，仅在正式游戏期间生效：
@@ -128,5 +130,7 @@ Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版
 - [矿物时运、猪灵交易和末地限制](docs/optional-optimizations.md)
 - [强制随机和隐藏角色分配](docs/role-options.md)
 - [扩展插件 API、SDK 与轮换插件示例](docs/extension-api.md)
+- [结构追踪解锁时间与客户端兼容](docs/structure-tracker-unlock.md)
+- [结构与传送门追踪的查询方式和性能边界](docs/tracking-performance.md)
 
 技术依据：[Paper 项目配置](https://docs.papermc.io/paper/dev/project-setup/)、[Paper Java 要求](https://docs.papermc.io/paper/getting-started/)、[Fabric Loom 插件区分](https://docs.fabricmc.net/develop/loom/)。

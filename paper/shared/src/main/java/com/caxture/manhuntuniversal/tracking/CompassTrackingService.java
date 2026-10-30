@@ -10,6 +10,7 @@ import com.caxture.manhuntuniversal.game.TrackingSettingsSnapshot;
 import com.caxture.manhuntuniversal.i18n.LanguageService;
 import com.caxture.manhuntuniversal.player.PendingPlayerState;
 import com.caxture.manhuntuniversal.protocol.ProtocolNamespace;
+import com.caxture.manhuntuniversal.protocol.TrackingAvailability;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -58,6 +59,8 @@ public final class CompassTrackingService {
     private final org.bukkit.NamespacedKey sessionKey;
     private final org.bukkit.NamespacedKey kindKey;
     private final TrackingSearchQueue searchQueue = new TrackingSearchQueue();
+    // Retained through finish/start for same-match role reassignment; holds no player/world objects.
+    private final StructureUnlockAnnouncements unlockAnnouncements = new StructureUnlockAnnouncements();
     private final TrackingSelectionAuthorizationRegistry selectionAuthorizations =
             new TrackingSelectionAuthorizationRegistry();
     private final Map<UUID, StaticSearchState> staticSearches = new HashMap<>();
@@ -99,6 +102,8 @@ public final class CompassTrackingService {
         clearRuntimeState();
         state = new TrackingSessionState(session.id());
         settings = session.settings().trackingSettings();
+        unlockAnnouncements.begin(session.id(), availability(session,
+                session.startedAt().orElseGet(() -> Instant.now(clock))));
         for (var participant : session.participants()) {
             Player player = onlinePlayer(participant.id());
             if (player != null && !pendingPlayers.needsReset(participant.id())) {
@@ -130,10 +135,24 @@ public final class CompassTrackingService {
             }
         }
         Instant now = Instant.now(clock);
+        TrackingAvailability availability = availability(session, now);
+        List<TrackingTargetId> newlyUnlocked = unlockAnnouncements.advance(availability);
         for (var participant : session.participants()) {
             Player player = onlinePlayer(participant.id());
             if (player == null) {
                 continue;
+            }
+            if (session.isRunnerAlive(participant.id()) && !pendingPlayers.needsReset(participant.id())) {
+                for (TrackingTargetId target : newlyUnlocked) {
+                    languages.send(player, "tracking.selection.unlocked",
+                            Map.of("target", languages.text(player, target.languageKey())));
+                }
+            }
+            if (session.isRunnerAlive(participant.id())
+                    && !StructureUnlockPolicy.allows(state.runnerSelection(participant.id()), availability)) {
+                state.setRunnerSelection(participant.id(), TrackingTargetId.NONE);
+                invalidateStructureSearch(participant.id());
+                languages.send(player, "tracking.selection.cleared");
             }
             TrackingCompassKind kind = expectedKind(session, participant.id()).orElse(null);
             if (!TrackingAccessPolicy.mayUse(
@@ -146,9 +165,16 @@ public final class CompassTrackingService {
                 continue;
             }
             if (!ensureCompass(session, player, kind) || kind == null) {
+                closeSelection(player);
                 clearActionBar(player);
                 continue;
             }
+            selectionAuthorizations.current(participant.id()).ifPresent(authorization -> {
+                if (canSelect(session, player)) {
+                    selectionPresenter.update(player, session.id(), authorization.authorizationId(),
+                            state.runnerSelection(participant.id()), availability);
+                } else closeSelection(player);
+            });
             TrackingDisplay display;
             if (kind == TrackingCompassKind.HUNTER) {
                 display = hunterDisplay(session, player);
@@ -156,7 +182,7 @@ public final class CompassTrackingService {
                 TrackingTargetId desired = state.runnerSelection(participant.id());
                 TrackingTargetId previous = desiredTargets.put(participant.id(), desired);
                 if (previous != desired) {
-                    invalidateParticipant(participant.id());
+                    invalidateStructureSearch(participant.id());
                     desiredTargets.put(participant.id(), desired);
                 }
                 display = desired == TrackingTargetId.NONE
@@ -257,9 +283,20 @@ public final class CompassTrackingService {
         TrackingSelectionAuthorizationRegistry.Authorization authorization =
                 selectionAuthorizations.issue(player.getUniqueId(), session.id());
         selectionPresenter.show(player, session.id(), authorization.authorizationId(),
-                state.runnerSelection(player.getUniqueId()),
+                state.runnerSelection(player.getUniqueId()), availability(session, Instant.now(clock)),
                 selected -> applyRunnerSelection(
-                        player, session.id(), authorization.authorizationId(), selected));
+                        player, session.id(), authorization.authorizationId(), selected),
+                () -> cancelRunnerSelection(player, session.id(), authorization.authorizationId()));
+    }
+
+    public void structureUnlockTimesChanged() {
+        runningSession().ifPresent(this::tick);
+    }
+
+    public void cancelRunnerSelection(Player player, UUID sessionId, long authorizationId) {
+        if (selectionAuthorizations.consume(player.getUniqueId(), sessionId, authorizationId)) {
+            selectionPresenter.close(player, sessionId, authorizationId);
+        }
     }
 
     public void finish(GameSession session) {
@@ -279,6 +316,7 @@ public final class CompassTrackingService {
 
     public void shutdown() {
         stopSearchTicker();
+        unlockAnnouncements.clear();
         for (Player player : server.getOnlinePlayers()) {
             closeSelection(player);
             removeMarkedCompasses(player);
@@ -368,19 +406,23 @@ public final class CompassTrackingService {
             long authorizationId,
             TrackingTargetId selected
     ) {
-        if (selected == null
-                || (selected != TrackingTargetId.NONE && !selected.selectableByRunner())
-                || !selectionAuthorizations.consume(
-                player.getUniqueId(), sessionId, authorizationId)) {
+        if (selected == null || selected != TrackingTargetId.NONE && !selected.selectableByRunner()
+                || selectionAuthorizations.current(player.getUniqueId()).filter(authorization ->
+                        authorization.sessionId().equals(sessionId)
+                                && authorization.authorizationId() == authorizationId).isEmpty()) {
             return;
         }
-        selectionPresenter.close(player, sessionId, authorizationId);
         GameSession session = runningSession().orElse(null);
         if (!canSelect(session, player) || !session.id().equals(sessionId)) {
+            cancelRunnerSelection(player, sessionId, authorizationId);
             return;
         }
+        // A forged or stale UI submission must never consume the valid menu capability.
+        if (!StructureUnlockPolicy.allows(selected, availability(session, Instant.now(clock)))) return;
+        if (!selectionAuthorizations.consume(player.getUniqueId(), sessionId, authorizationId)) return;
+        selectionPresenter.close(player, sessionId, authorizationId);
         TrackingTargetId result = state.setRunnerSelection(player.getUniqueId(), selected);
-        invalidateParticipant(player.getUniqueId());
+        invalidateStructureSearch(player.getUniqueId());
         languages.send(player, result == TrackingTargetId.NONE
                 ? "tracking.selection.cleared" : "tracking.selection.changed",
                 result == TrackingTargetId.NONE ? Map.of()
@@ -391,6 +433,7 @@ public final class CompassTrackingService {
     private boolean canSelect(GameSession session, Player player) {
         return session != null
                 && configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED)
+                && configuration.values().runnerStructureUnlockTimes().anyEnabled()
                 && !pendingPlayers.needsReset(player.getUniqueId())
                 && session.isRunnerAlive(player.getUniqueId())
                 && state != null
@@ -933,7 +976,8 @@ public final class CompassTrackingService {
         if (session.isEliminatedParticipant(playerId)) return Optional.empty();
         Role role = session.roleOf(playerId).orElse(null);
         if (role == Role.RUNNER
-                && configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED)) {
+                && configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED)
+                && configuration.values().runnerStructureUnlockTimes().anyEnabled()) {
             return Optional.of(TrackingCompassKind.RUNNER);
         }
         if (role == Role.HUNTER
@@ -943,12 +987,27 @@ public final class CompassTrackingService {
         return Optional.empty();
     }
 
+    private TrackingAvailability availability(GameSession session, Instant now) {
+        return StructureUnlockPolicy.availability(configuration.values().runnerStructureUnlockTimes(),
+                session.startedAt().orElse(now), now);
+    }
+
     private void closeSelection(Player player) {
         selectionAuthorizations.invalidate(player.getUniqueId()).ifPresent(authorization ->
                 selectionPresenter.close(
                         player,
                         authorization.sessionId(),
                         authorization.authorizationId()));
+    }
+
+    private void invalidateStructureSearch(UUID playerId) {
+        // Portal lookup depends on the viewer's world/position, not the selected structure.
+        if (state != null) {
+            state.invalidate(playerId);
+        }
+        staticSearches.remove(playerId);
+        desiredTargets.remove(playerId);
+        searchQueue.invalidate(playerId, TrackingSearchQueue.Lane.STATIC);
     }
 
     private void invalidateParticipant(UUID playerId) {

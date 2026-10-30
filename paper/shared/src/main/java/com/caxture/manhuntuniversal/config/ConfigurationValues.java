@@ -98,4 +98,11 @@ public final class ConfigurationValues {
                 get(IntConfigKey.TRACKING_RETARGET_COOLDOWN_SECONDS),
                 get(IntConfigKey.TRACKING_SEARCH_RADIUS_BLOCKS));
     }
+
+    public RunnerStructureUnlockTimes runnerStructureUnlockTimes() {
+        return new RunnerStructureUnlockTimes(
+                get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_VILLAGE),
+                get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_BASTION_REMNANT),
+                get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_NETHER_FORTRESS));
+    }
 }
