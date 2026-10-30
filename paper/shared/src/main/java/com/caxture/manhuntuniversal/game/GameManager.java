@@ -6,11 +6,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Objects;
+import java.util.function.BiFunction;
 
 public final class GameManager {
     private final RoleAssigner roleAssigner;
     private GameSession activeSession;
     private final TeamSelectionService teamSelections = new TeamSelectionService(() -> activeSession != null);
+    private BiFunction<GameSession, GameResult, Optional<GameResult>> victoryDecision = (session, result) -> Optional.of(result);
 
     public GameManager(RoleAssigner roleAssigner) {
         this.roleAssigner = roleAssigner;
@@ -56,6 +59,46 @@ public final class GameManager {
         return teamSelections;
     }
 
+    public synchronized void onVictoryDecision(BiFunction<GameSession, GameResult, Optional<GameResult>> decision) {
+        victoryDecision = Objects.requireNonNull(decision);
+    }
+
+    public synchronized boolean assignRoles(UUID expectedSessionId, Map<UUID, Role> assignment, Instant at) {
+        if (!isRunning(expectedSessionId) || assignment == null || at == null) return false;
+        var ids = activeSession.participants().stream().map(Participant::id).toList();
+        if (!assignment.keySet().equals(new java.util.HashSet<>(ids)) || assignment.values().stream().anyMatch(Objects::isNull)) return false;
+        for (UUID id : ids) {
+            if (activeSession.isEliminatedParticipant(id) && assignment.get(id) != activeSession.roleOf(id).orElseThrow()) return false;
+        }
+        long livingRunners = ids.stream().filter(id -> !activeSession.isEliminatedParticipant(id)
+                && assignment.get(id) == Role.RUNNER).count();
+        long livingHunters = ids.stream().filter(id -> !activeSession.isEliminatedParticipant(id)
+                && assignment.get(id) == Role.HUNTER).count();
+        if (livingRunners == 0 || livingHunters == 0) return false;
+        activeSession.assignRunners(ids.stream().filter(id -> assignment.get(id) == Role.RUNNER).toList(), at);
+        return true;
+    }
+
+    public synchronized List<UUID> randomRunners(List<UUID> candidates, int runnerCount) {
+        List<UUID> stable = List.copyOf(candidates);
+        if (stable.stream().distinct().count() != stable.size() || runnerCount < 0 || runnerCount > stable.size()) {
+            throw new IllegalArgumentException("Invalid random candidates or runner count");
+        }
+        if (runnerCount == 0) return List.of();
+        if (runnerCount == stable.size()) return stable;
+        return roleAssigner.select(stable, runnerCount);
+    }
+
+    public synchronized boolean reviveParticipant(UUID expectedSessionId, UUID playerId) {
+        return isRunning(expectedSessionId) && activeSession.reviveParticipant(playerId);
+    }
+
+    public synchronized Optional<GameResult> finishCustom(UUID expectedSessionId, GameWinner winner, String reason, Instant at) {
+        if (!isRunning(expectedSessionId) || winner == null || reason == null || reason.isBlank()) return Optional.empty();
+        return settle(winner, GameResultReason.CUSTOM, TerminationReason.EXTENSION_FINISHED, at,
+                Optional.empty(), Optional.empty(), reason);
+    }
+
     public synchronized Optional<GameSession> activate(UUID expectedSessionId, Instant at) {
         if (!matches(expectedSessionId)) {
             return Optional.empty();
@@ -92,10 +135,16 @@ public final class GameManager {
             Optional<UUID> killer,
             Instant at
     ) {
-        if (!isRunning(expectedSessionId) || !activeSession.eliminateRunner(playerId)) {
+        if (!isRunning(expectedSessionId) || !activeSession.isRunnerAlive(playerId)) {
             return Optional.empty();
         }
-        if (!activeSession.livingRunnerIds().isEmpty()) {
+        return eliminateParticipant(expectedSessionId, playerId, killer, at);
+    }
+
+    public synchronized Optional<GameResult> eliminateParticipant(UUID expectedSessionId, UUID playerId,
+                                                                 Optional<UUID> killer, Instant at) {
+        if (!isRunning(expectedSessionId) || !activeSession.eliminateParticipant(playerId)) return Optional.empty();
+        if (activeSession.roleOf(playerId).orElseThrow() != Role.RUNNER || !activeSession.livingRunnerIds().isEmpty()) {
             return Optional.empty();
         }
         return settle(
@@ -141,7 +190,8 @@ public final class GameManager {
         if (!matches(expectedSessionId) || activeSession.state() == SessionState.SETTLING) {
             return Optional.empty();
         }
-        if (reason != TerminationReason.ADMIN_STOPPED && reason != TerminationReason.PLUGIN_DISABLED) {
+        if (reason != TerminationReason.ADMIN_STOPPED && reason != TerminationReason.PLUGIN_DISABLED
+                && reason != TerminationReason.START_CANCELLED) {
             throw new IllegalArgumentException("Cancellation requires a stop reason");
         }
         activeSession.settle(at, reason);
@@ -186,21 +236,29 @@ public final class GameManager {
             Optional<UUID> deadRunner,
             Optional<UUID> killer
     ) {
+        return settle(winner, resultReason, terminationReason, at, deadRunner, killer, "");
+    }
+
+    private Optional<GameResult> settle(GameWinner winner, GameResultReason resultReason,
+                                       TerminationReason terminationReason, Instant at,
+                                       Optional<UUID> deadRunner, Optional<UUID> killer, String customReason) {
         if (activeSession == null || activeSession.state() != SessionState.RUNNING) {
             return Optional.empty();
         }
-        activeSession.settle(at, terminationReason);
-        return Optional.of(new GameResult(
-                activeSession.id(),
-                winner,
-                resultReason,
-                at,
-                activeSession.participants(),
-                activeSession.runnerIds(),
-                activeSession.hunterIds(),
-                activeSession.roundHistory(),
-                deadRunner,
-                killer));
+        GameSession candidateSession = activeSession;
+        long revision = candidateSession.revision();
+        GameResult candidate = new GameResult(candidateSession.id(), winner, resultReason, at,
+                candidateSession.participants(), candidateSession.runnerIds(), candidateSession.hunterIds(),
+                candidateSession.roundHistory(), deadRunner, killer, customReason);
+        Optional<GameResult> decided = victoryDecision.apply(candidateSession, candidate);
+        if (decided.isEmpty() || activeSession != candidateSession || candidateSession.revision() != revision
+                || candidateSession.state() != SessionState.RUNNING) return Optional.empty();
+        GameResult chosen = decided.orElseThrow();
+        if (!candidateSession.id().equals(chosen.sessionId())) return Optional.empty();
+        candidateSession.settle(at, terminationReason);
+        return Optional.of(new GameResult(candidateSession.id(), chosen.winner(), chosen.reason(), at,
+                candidateSession.participants(), candidateSession.runnerIds(), candidateSession.hunterIds(),
+                candidateSession.roundHistory(), chosen.deadRunner(), chosen.killer(), chosen.customReason()));
     }
 
     private boolean matches(UUID expectedSessionId) {

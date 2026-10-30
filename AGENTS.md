@@ -2,7 +2,7 @@
 
 - 目标为 Minecraft 1.21.11、26.3 的 Paper 插件和 Fabric 客户端模组。
 - 用户指定迁移来源为 `E:\coding\mc-randomanhunt-plugin-26.3`，迁移其除随机轮换角色以外的全部 Paper 功能和 Fabric 显示功能。旧工程已有功能不得重新实现。
-- 开局前允许玩家选择 hunter/runner/random；指定速通者优先，仅从 random 补足人数，每局身份固定。缺少随机候选时拒绝开局。
+- 开局前允许玩家选择 hunter/runner/random；指定速通者优先，仅从 random 补足人数，默认每局身份固定。缺少随机候选时拒绝开局。扩展可通过公共 API 显式重分配身份；核心不自带轮换调度。
 - `force-random-roles=false` 默认允许选队；开启后立即清空所有预约、禁用全部 join 入口/补全/登录提示，已锁定角色不重抽。关闭不恢复旧选择。
 - `hide-role-assignments=false` 与强制随机独立；开启后不在聊天、Tab 或名称牌展示具体选择/分配，status 不显示双方名单，结算不显示名单或击杀者。保留个人身份标题与指南针；切换隐藏即时恢复/重显颜色，兼容离线恢复。
 - 选队按 UUID 存于内存，离线或对局结束/停止/倒计时取消清空，倒计时开始锁定。仅空闲时允许缩容清除最后加入的超额速通者选择；倒计时/运行中只保存下一局配置，不清除选择或触发 capacity-cleared。
@@ -12,7 +12,9 @@
 - 可选优化仅 RUNNING 生效：`ore-fortune-level=0`（0–10，虚拟工具查询原版矿物掉落，不修改玩家工具）、`adjust-piglin-bartering=false`（单结果，64 金期望 16 珍珠/10 黑曜石/3 普通与喷溅抗火，其他结果保持相对比例）、`hunter-end-restriction-enabled=false`（存活速通者实际进入末地后本局永久解锁猎人放眼和进入限制）。
 - README 面向公开 GitHub 仓库；顶部不写玩法功能清单或当前开发进度，不写本机参考工程绝对路径。
 - 迁移时保留原有行为、配置语义和通信协议；版本适配仅处理必要的 API / 映射差异。不得借迁移擅自设计新玩法或协议。
-- `common`、`protocol` 使用 Java 21，不得依赖 Bukkit、Paper、Fabric 或 Minecraft 类。
+- `common`、`protocol`、`api` 使用 Java 21，不得依赖 Bukkit、Paper、Fabric 或 Minecraft 类；`api-paper` 为 Java 21 的 Paper 服务和事件合同。
+- API 独立版本 1.0.0，入口为 `com.caxture.manhuntuniversal.api`，通过 Bukkit ServicesManager 获取。扩展持有插件绑定注册句柄和独占控制域，写操作校验主线程/对局 ID/修订号及重入；不得直接修改内部对象。
+- 角色变更同步指南针、选择授权、追踪和隐藏显示，不自动复活淘汰者、不重复开局重置、不撤销末地解锁。淘汰/胜负策略在核心提交前调用，关停清理不得被玩法策略阻止。
 - 平台公共源码放在 `paper/shared`、`fabric/shared`；版本相关源码放在对应版本模块，避免在公共逻辑中散布版本判断。
 - 依赖坐标统一放在 `gradle/libs.versions.toml`。1.21.11 模块编译为 Java 21，26.3 模块编译为 Java 25。
 - Fabric 1.21.11 使用 remap Loom 和 Mojang mappings；26.3 使用非 remap Loom。两者必须独立验证。

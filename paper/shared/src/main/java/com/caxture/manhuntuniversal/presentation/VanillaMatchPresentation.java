@@ -48,6 +48,15 @@ public final class VanillaMatchPresentation implements MatchPresentation {
 
     @Override
     public void showStart(GameSession session) {
+        showRoles(session, "game.start.title");
+    }
+
+    @Override
+    public void showRolesChanged(GameSession session) {
+        showRoles(session, "game.roles.changed-title");
+    }
+
+    private void showRoles(GameSession session, String titleKey) {
         if (!hideRoles.getAsBoolean()) {
             broadcast("game.start.runners", Map.of(
                     "players", MatchTextFormatter.names(session.participants(), session.runnerIds())));
@@ -55,7 +64,7 @@ public final class VanillaMatchPresentation implements MatchPresentation {
         forEachOnlineParticipant(session.participants(), player -> {
             Role role = session.roleOf(player.getUniqueId()).orElseThrow();
             player.showTitle(Title.title(
-                    language.component(player, "game.start.title", Map.of()),
+                    language.component(player, titleKey, Map.of()),
                     language.component(player, "game.start.role-subtitle", Map.of(
                             "role", language.text(player, roleKey(role)))), SHORT_TITLE));
             PresentationSoundCue.roleReveal().play(player);

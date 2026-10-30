@@ -86,6 +86,8 @@ Linux / macOS 使用 `bash ./gradlew` 替代 `.\gradlew.bat`。如果 JDK 未被
 ```text
 common/                 纯 Java 公共逻辑预留区（Java 21）
 protocol/               原项目协议及编解码（Java 21，保持原样）
+api/                    公共扩展接口与不可变数据（Java 21）
+api-paper/              Paper 服务入口和事件 SDK（Java 21）
 paper/
   shared/src/main/      两版本共享的服务端逻辑、入口、资源
   shared/src/test/      服务端逻辑的针对性检查
@@ -125,5 +127,6 @@ Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版
 - [速通者淘汰、身份颜色和刷怪笼保护](docs/elimination-and-colors.md)
 - [矿物时运、猪灵交易和末地限制](docs/optional-optimizations.md)
 - [强制随机和隐藏角色分配](docs/role-options.md)
+- [扩展插件 API、SDK 与轮换插件示例](docs/extension-api.md)
 
 技术依据：[Paper 项目配置](https://docs.papermc.io/paper/dev/project-setup/)、[Paper Java 要求](https://docs.papermc.io/paper/getting-started/)、[Fabric Loom 插件区分](https://docs.fabricmc.net/develop/loom/)。

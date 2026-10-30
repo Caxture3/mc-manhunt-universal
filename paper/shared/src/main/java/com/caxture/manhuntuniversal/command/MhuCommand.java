@@ -63,6 +63,12 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        boolean readOnly = args.length == 0 || args[0].equalsIgnoreCase("status")
+                || args[0].equalsIgnoreCase("config") && args.length <= 2;
+        if (!readOnly && activeGame.extensionHooks().mutationActive()) {
+            language.send(sender, "command.busy");
+            return true;
+        }
         if (args.length > 0 && args[0].equalsIgnoreCase("join")) {
             join(sender, args);
             return true;
@@ -199,6 +205,10 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
 
     private boolean saveConfig(CommandSender sender, String requested, IntConfigKey integerKey,
                                BooleanConfigKey booleanKey, String raw) {
+        if (activeGame.extensionHooks().mutationActive()) {
+            language.send(sender, "command.busy");
+            return false;
+        }
         try {
             boolean saved;
             String value;

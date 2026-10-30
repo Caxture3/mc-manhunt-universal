@@ -12,6 +12,8 @@ import com.caxture.manhuntuniversal.game.GameSession;
 import com.caxture.manhuntuniversal.game.SessionState;
 import com.caxture.manhuntuniversal.game.TerminationReason;
 import com.caxture.manhuntuniversal.game.TrackingSettingsSnapshot;
+import com.caxture.manhuntuniversal.game.GameWinner;
+import com.caxture.manhuntuniversal.extension.GameExtensionHooks;
 import com.caxture.manhuntuniversal.player.CountdownBlindnessService;
 import com.caxture.manhuntuniversal.player.PendingPlayerState;
 import com.caxture.manhuntuniversal.player.PlayerResetService;
@@ -53,6 +55,13 @@ public final class ActiveGameCoordinator {
     private final RunnerSpectatorService spectators;
     private UUID countdownSessionId;
     private int countdownRemaining;
+    private GameExtensionHooks extensionHooks = GameExtensionHooks.NONE;
+
+    public void setExtensionHooks(GameExtensionHooks hooks) {
+        extensionHooks = java.util.Objects.requireNonNull(hooks);
+    }
+
+    public GameExtensionHooks extensionHooks() { return extensionHooks; }
 
     public ActiveGameCoordinator(
             JavaPlugin plugin,
@@ -78,7 +87,8 @@ public final class ActiveGameCoordinator {
         this.tracking = tracking;
         this.clock = clock;
         this.spectators = new RunnerSpectatorService(server, gameManager,
-                action -> server.getScheduler().runTask(plugin, action));
+                action -> server.getScheduler().runTask(plugin, () ->
+                        extensionHooks.inMutation(() -> { action.run(); return null; })));
         this.pendingResetRetrier = new PendingResetRetrier(action -> {
             BukkitTask task = server.getScheduler().runTaskTimer(plugin, action, 1L, 20L);
             return task::cancel;
@@ -119,6 +129,10 @@ public final class ActiveGameCoordinator {
     }
 
     public boolean activate(GameSession session) {
+        return extensionHooks.inMutation(() -> activateInternal(session));
+    }
+
+    private boolean activateInternal(GameSession session) {
         TrackingSettings trackingSettings = configuration.values().trackingSettings();
         GameSession activated = gameManager.activate(
                 session.id(), Instant.now(clock),
@@ -132,6 +146,7 @@ public final class ActiveGameCoordinator {
         identity.begin(activated);
         tracking.start(activated);
         presentation.showStart(activated);
+        extensionHooks.started(activated);
         // With player reset disabled, a runner may already be in the End at activation.
         activated.livingRunnerIds().forEach(playerId -> {
             Player player = server.getPlayer(playerId);
@@ -147,6 +162,10 @@ public final class ActiveGameCoordinator {
     }
 
     public boolean stopAdmin() {
+        return extensionHooks.inMutation(this::stopAdminInternal);
+    }
+
+    private boolean stopAdminInternal() {
         GameSession session = gameManager.activeSession().orElse(null);
         if (session == null) {
             return false;
@@ -155,6 +174,10 @@ public final class ActiveGameCoordinator {
     }
 
     public void disable() {
+        extensionHooks.inMutation(() -> { disableInternal(); return null; });
+    }
+
+    private void disableInternal() {
         gameManager.activeSession().ifPresent(session ->
                 cancel(session.id(), TerminationReason.PLUGIN_DISABLED, true));
         cancelAllTasks();
@@ -165,22 +188,106 @@ public final class ActiveGameCoordinator {
     }
 
     public void abortStart(UUID expectedSessionId) {
-        cancel(expectedSessionId, TerminationReason.ADMIN_STOPPED, false);
+        cancel(expectedSessionId, TerminationReason.START_CANCELLED, false);
     }
 
     public void playerDied(Player player) {
-        GameSession session = runningSession().orElse(null);
-        if (session == null || !session.isRunnerAlive(player.getUniqueId())) {
-            return;
+        extensionHooks.inMutation(() -> {
+            GameSession session = runningSession().orElse(null);
+            if (session != null) eliminateInMatch(session, player.getUniqueId(),
+                    Optional.ofNullable(player.getKiller()).map(Player::getUniqueId), "DEATH");
+            return null;
+        });
+    }
+
+    public boolean eliminateForApi(UUID sessionId, UUID playerId) {
+        return extensionHooks.inMutation(() -> {
+            GameSession session = currentSession(sessionId).filter(s -> s.state() == SessionState.RUNNING).orElse(null);
+            return session != null && eliminateInMatch(session, playerId, Optional.empty(), "API");
+        });
+    }
+
+    private boolean eliminateInMatch(GameSession session, UUID playerId, Optional<UUID> killer, String cause) {
+        if (session.participant(playerId).isEmpty() || session.isEliminatedParticipant(playerId)) return false;
+        long revision = session.revision();
+        if (!extensionHooks.shouldEliminate(session, playerId, cause)
+                || currentSession(session.id()).orElse(null) != session || session.state() != SessionState.RUNNING
+                || session.revision() != revision) return false;
+        Optional<GameResult> result = gameManager.eliminateParticipant(session.id(), playerId, killer, Instant.now(clock));
+        if (!session.isEliminatedParticipant(playerId)) return false;
+        // A synchronous listener may have stopped this game during the finishing check.
+        if (currentSession(session.id()).orElse(null) != session) return true;
+        pendingResetRetrier.cancel(playerId);
+        pendingPlayers.completeReset(playerId);
+        Player player = server.getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            spectators.eliminated(session, player);
+            tracking.runnerEliminated(player);
         }
-        Optional<UUID> killer = Optional.ofNullable(player.getKiller()).map(Player::getUniqueId);
-        Optional<GameResult> result = gameManager.recordRunnerDeath(
-                session.id(), player.getUniqueId(), killer, Instant.now(clock));
-        pendingResetRetrier.cancel(player.getUniqueId());
-        pendingPlayers.completeReset(player.getUniqueId());
-        spectators.eliminated(session, player);
-        tracking.runnerEliminated(player);
+        extensionHooks.eliminated(session, playerId, cause);
         result.ifPresent(this::finish);
+        return true;
+    }
+
+    public boolean reviveForApi(UUID sessionId, UUID playerId) {
+        return extensionHooks.inMutation(() -> {
+            GameSession session = currentSession(sessionId).filter(s -> s.state() == SessionState.RUNNING).orElse(null);
+            if (session == null || !gameManager.reviveParticipant(sessionId, playerId)) return false;
+            spectators.revived(playerId);
+            Player player = server.getPlayer(playerId);
+            if (player != null && player.isOnline()) {
+                Runnable refresh = () -> {
+                    if (currentSession(sessionId).orElse(null) != session || session.state() != SessionState.RUNNING
+                            || session.isEliminatedParticipant(playerId) || !player.isOnline() || player.isDead()) return;
+                    extensionHooks.inMutation(() -> {
+                        tracking.playerJoined(player, session);
+                        detectTargetEnd(player);
+                        return null;
+                    });
+                };
+                if (player.isDead()) server.getScheduler().runTask(plugin, refresh); else refresh.run();
+            }
+            extensionHooks.revived(session, playerId);
+            return true;
+        });
+    }
+
+    public boolean finishForApi(UUID sessionId, GameWinner winner, String reason) {
+        return extensionHooks.inMutation(() -> {
+            Optional<GameResult> result = gameManager.finishCustom(sessionId, winner, reason, Instant.now(clock));
+            result.ifPresent(this::finish);
+            return result.isPresent();
+        });
+    }
+
+    public boolean playerAvailableForRoleChange(UUID playerId) {
+        Player player = server.getPlayer(playerId);
+        return player != null && player.isOnline() && !player.isDead() && !pendingPlayers.needsReset(playerId);
+    }
+
+    public void rolesChanged(GameSession session) {
+        requireRunningSession(session);
+        // Revoke every old UI capability, search token and bound compass before issuing new roles.
+        tracking.finish(session);
+        requireRunningSession(session);
+        identity.clear(session);
+        requireRunningSession(session);
+        identity.begin(session);
+        requireRunningSession(session);
+        tracking.start(session);
+        requireRunningSession(session);
+        presentation.showRolesChanged(session);
+        // A newly assigned runner may already be in the End.
+        session.livingRunnerIds().forEach(id -> {
+            Player player = server.getPlayer(id);
+            if (player != null && player.isOnline()) detectTargetEnd(player);
+        });
+    }
+
+    private void requireRunningSession(GameSession session) {
+        if (currentSession(session.id()).orElse(null) != session || session.state() != SessionState.RUNNING) {
+            throw new IllegalStateException("Match changed during role synchronization");
+        }
     }
 
     public void playerRespawned(Player player) {
@@ -188,7 +295,14 @@ public final class ActiveGameCoordinator {
     }
 
     public void playerChangedWorld(Player player) {
-        tracking.playerChangedWorld(player, null);
+        extensionHooks.inMutation(() -> {
+            tracking.playerChangedWorld(player, null);
+            detectTargetEnd(player);
+            return null;
+        });
+    }
+
+    private void detectTargetEnd(Player player) {
         if (player.getWorld().getEnvironment() != World.Environment.THE_END) {
             return;
         }
@@ -196,10 +310,15 @@ public final class ActiveGameCoordinator {
         if (session != null && gameManager.bindTargetEnd(
                 session.id(), player.getUniqueId(), player.getWorld().getUID())) {
             startDragonPresenceProbe(session.id(), player.getWorld().getUID());
+            extensionHooks.endEntered(session, player.getUniqueId(), player.getWorld().getUID());
         }
     }
 
     public void enderDragonDied(UUID worldId) {
+        extensionHooks.inMutation(() -> { enderDragonDiedInternal(worldId); return null; });
+    }
+
+    private void enderDragonDiedInternal(UUID worldId) {
         GameSession session = runningSession().orElse(null);
         if (session != null) {
             gameManager.recordEnderDragonDeath(
@@ -229,7 +348,7 @@ public final class ActiveGameCoordinator {
             blindness.restore(player);
             return;
         }
-        if (session.isEliminatedRunner(player.getUniqueId())) {
+        if (session.isEliminatedParticipant(player.getUniqueId())) {
             blindness.restore(player);
             identity.applyJoiningPlayer(session, player);
             return;
@@ -296,8 +415,11 @@ public final class ActiveGameCoordinator {
                 }
                 cancelDragonPresenceTask();
                 if (outcome == EndDragonPresenceProbe.Outcome.ABSENT) {
-                    gameManager.recordEnderDragonAbsent(
-                            sessionId, worldId, Instant.now(clock)).ifPresent(ActiveGameCoordinator.this::finish);
+                    extensionHooks.inMutation(() -> {
+                        gameManager.recordEnderDragonAbsent(sessionId, worldId, Instant.now(clock))
+                                .ifPresent(ActiveGameCoordinator.this::finish);
+                        return null;
+                    });
                 }
             }
         }.runTaskTimer(plugin, 1L, 1L);
@@ -344,7 +466,11 @@ public final class ActiveGameCoordinator {
                 presentation.showStopped(reason);
             }
         } finally {
-            cleanup(session);
+            try {
+                cleanup(session);
+            } finally {
+                extensionHooks.ended(session, reason, null);
+            }
         }
         return true;
     }
@@ -357,28 +483,33 @@ public final class ActiveGameCoordinator {
         try {
             presentation.showResult(result);
         } finally {
-            cleanup(session);
+            try {
+                cleanup(session);
+            } finally {
+                extensionHooks.ended(session, result.reason() == com.caxture.manhuntuniversal.game.GameResultReason.CUSTOM
+                        ? TerminationReason.EXTENSION_FINISHED : switch (result.reason()) {
+                            case RUNNER_DIED -> TerminationReason.RUNNER_DIED;
+                            case ENDER_DRAGON_DEFEATED -> TerminationReason.ENDER_DRAGON_DEFEATED;
+                            case ENDER_DRAGON_ABSENT -> TerminationReason.ENDER_DRAGON_ABSENT;
+                            case CUSTOM -> TerminationReason.EXTENSION_FINISHED;
+                        }, result);
+            }
         }
     }
 
     private void cleanup(GameSession session) {
-        cancelAllTasks();
-        blindness.restoreAllOnline();
-        try {
-            tracking.finish(session);
-        } finally {
-            try {
-                identity.clear(session);
-            } finally {
-                try {
-                    spectators.finish(session.id());
-                } finally {
-                    session.participants().forEach(
-                            participant -> pendingPlayers.completeReset(participant.id()));
-                    gameManager.clearSettled(session.id());
-                }
+        // Every subsystem must get its cleanup attempt even when another plugin breaks a platform operation.
+        for (Runnable action : java.util.List.<Runnable>of(
+                this::cancelAllTasks, blindness::restoreAllOnline,
+                () -> tracking.finish(session), () -> identity.clear(session),
+                () -> spectators.finish(session.id()),
+                () -> session.participants().forEach(participant -> pendingPlayers.completeReset(participant.id())))) {
+            try { action.run(); }
+            catch (RuntimeException | LinkageError failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE, "Match cleanup operation failed", failure);
             }
         }
+        gameManager.clearSettled(session.id());
     }
 
     private Optional<GameSession> currentSession(UUID expectedSessionId) {

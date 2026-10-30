@@ -94,6 +94,55 @@ class RunnerSpectatorServiceTest {
         spectators.eliminated(session, player.player);
     }
 
+    @Test
+    void revivalBeforeQueuedDeathCallbackStillRespawnsAndRestoresOriginalMode() {
+        GameSession session = start();
+        PlayerState player = player(first, GameMode.ADVENTURE);
+        eliminate(session, player);
+        assertTrue(manager.reviveParticipant(session.id(), first));
+        spectators.revived(first);
+        drain();
+        assertFalse(player.dead);
+        assertEquals(1, player.respawns);
+        assertEquals(GameMode.ADVENTURE, player.mode);
+        assertFalse(session.isEliminatedParticipant(first));
+    }
+
+    @Test
+    void offlineApiEliminationCapturesModeOnJoinAndOfflineRevivalRestoresIt() {
+        GameSession session = start();
+        UUID hunter = session.hunterIds().getFirst();
+        PlayerState player = player(hunter, GameMode.CREATIVE);
+        player.online = false;
+        manager.eliminateParticipant(session.id(), hunter, Optional.empty(), Instant.EPOCH);
+        player.online = true;
+        spectators.joined(player.player);
+        drain();
+        assertEquals(GameMode.SPECTATOR, player.mode);
+        player.online = false;
+        assertTrue(manager.reviveParticipant(session.id(), hunter));
+        spectators.revived(hunter);
+        player.online = true;
+        spectators.joined(player.player);
+        assertEquals(GameMode.CREATIVE, player.mode);
+    }
+
+    @Test
+    void aRespawnListenerCanReEliminateWithoutAnOlderRevivalRestoringSurvival() {
+        GameSession session = start();
+        PlayerState player = player(first, GameMode.ADVENTURE);
+        eliminate(session, player);
+        assertTrue(manager.reviveParticipant(session.id(), first));
+        spectators.revived(first);
+        player.afterRespawn = () -> {
+            manager.eliminateParticipant(session.id(), first, Optional.empty(), Instant.EPOCH);
+            spectators.eliminated(session, player.player);
+        };
+        drain();
+        assertTrue(session.isEliminatedParticipant(first));
+        assertEquals(GameMode.SPECTATOR, player.mode);
+    }
+
     private GameSession start() {
         manager.teamSelections().choose(first, TeamPreference.RUNNER, 2);
         manager.teamSelections().choose(second, TeamPreference.RUNNER, 2);
@@ -118,12 +167,13 @@ class RunnerSpectatorServiceTest {
         GameMode mode;
         boolean online = true, dead = true;
         int respawns;
+        Runnable afterRespawn = () -> {};
         final Player player;
         PlayerState(UUID id, GameMode initial) {
             this.id = id;
             mode = initial;
             Player.Spigot spigot = new Player.Spigot() {
-                @Override public void respawn() { dead = false; respawns++; }
+                @Override public void respawn() { dead = false; respawns++; afterRespawn.run(); }
             };
             player = proxy(Player.class, (object, method, args) -> switch (method.getName()) {
                 case "getUniqueId" -> id;

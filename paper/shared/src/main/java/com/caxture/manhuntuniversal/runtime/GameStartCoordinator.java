@@ -1,6 +1,7 @@
 package com.caxture.manhuntuniversal.runtime;
 
 import com.caxture.manhuntuniversal.config.BooleanConfigKey;
+import com.caxture.manhuntuniversal.api.OperationStatus;
 import com.caxture.manhuntuniversal.config.ConfigurationService;
 import com.caxture.manhuntuniversal.config.ConfigurationValues;
 import com.caxture.manhuntuniversal.config.IntConfigKey;
@@ -71,6 +72,19 @@ public final class GameStartCoordinator {
     }
 
     public boolean start(CommandSender sender, int countdownSeconds) {
+        return startDetailed(sender, countdownSeconds) == OperationStatus.OK;
+    }
+
+    public OperationStatus startForApi(int countdownSeconds) {
+        if (countdownSeconds < 0 || countdownSeconds > 60) return OperationStatus.INVALID_ARGUMENT;
+        return startDetailed(server.getConsoleSender(), countdownSeconds);
+    }
+
+    private OperationStatus startDetailed(CommandSender sender, int countdownSeconds) {
+        return activeGame.extensionHooks().inMutation(() -> doStart(sender, countdownSeconds));
+    }
+
+    private OperationStatus doStart(CommandSender sender, int countdownSeconds) {
         List<Player> online = new ArrayList<>(server.getOnlinePlayers());
         online.sort(Comparator.comparing(player -> player.getUniqueId().toString()));
         List<Participant> participants = online.stream()
@@ -80,43 +94,55 @@ public final class GameStartCoordinator {
         StartResult result = gameManager.start(participants, settings(values), Instant.now(clock));
         if (result.status() == StartStatus.ALREADY_RUNNING) {
             language.send(sender, "game.start.already-running");
-            return false;
+            return OperationStatus.START_REJECTED;
         }
         if (result.status() == StartStatus.NOT_ENOUGH_PLAYERS) {
             language.send(sender, "game.start.not-enough-players", Map.of(
                     "count", Integer.toString(values.get(IntConfigKey.RUNNER_COUNT) + 1)));
-            return false;
+            return OperationStatus.START_REJECTED;
         }
         if (result.status() == StartStatus.NOT_ENOUGH_RANDOM_PLAYERS) {
             language.send(sender, "game.start.not-enough-random", Map.of(
                     "count", Integer.toString(result.missingRunners())));
-            return false;
+            return OperationStatus.START_REJECTED;
         }
         if (result.status() == StartStatus.RUNNER_SELECTION_LIMIT_EXCEEDED) {
             language.send(sender, "team.runner-full", Map.of(
                     "count", Integer.toString(values.get(IntConfigKey.RUNNER_COUNT))));
-            return false;
+            return OperationStatus.START_REJECTED;
         }
         GameSession session = result.session().orElseThrow();
+        long revision = session.revision();
+        if (!activeGame.extensionHooks().preparing(session, countdownSeconds)) {
+            activeGame.abortStart(session.id());
+            return OperationStatus.CANCELLED;
+        }
+        if (gameManager.activeSession().orElse(null) != session || session.revision() != revision
+                || session.state() != SessionState.COUNTDOWN) return OperationStatus.CANCELLED;
         if (countdownSeconds == 0) {
-            activate(session, sender);
-            return true;
+            return activate(session, sender) ? OperationStatus.OK : OperationStatus.START_REJECTED;
         }
         online.forEach(blindness::apply);
         activeGame.beginCountdown(session, countdownSeconds, () -> activate(session, sender));
-        return true;
+        activeGame.extensionHooks().countdown(session, countdownSeconds);
+        return gameManager.activeSession().orElse(null) == session ? OperationStatus.OK : OperationStatus.CANCELLED;
     }
 
-    private void activate(GameSession session, CommandSender sender) {
+    private boolean activate(GameSession session, CommandSender sender) {
+        // Countdown completion runs on a later tick, outside the original start() mutation scope.
+        return activeGame.extensionHooks().inMutation(() -> activateGuarded(session, sender));
+    }
+
+    private boolean activateGuarded(GameSession session, CommandSender sender) {
         GameSession current = gameManager.activeSession().orElse(null);
         if (current == null || !current.id().equals(session.id())
                 || current.state() != SessionState.COUNTDOWN) {
-            return;
+            return false;
         }
         if (session.settings().resetPlayersAtStart() && !preparePlayers(session)) {
             language.send(sender, "game.start.teleport-failed");
             activeGame.abortStart(session.id());
-            return;
+            return false;
         }
         if (!session.settings().resetPlayersAtStart()) {
             List<Player> onlineParticipants = session.participants().stream()
@@ -132,11 +158,11 @@ public final class GameStartCoordinator {
                     language.send(sender, "game.start.compass-no-space", placeholders);
                 }
                 activeGame.abortStart(session.id());
-                return;
+                return false;
             }
             blindness.restoreAllOnline();
         }
-        activeGame.activate(session);
+        return activeGame.activate(session);
     }
 
     private boolean preparePlayers(GameSession session) {
@@ -156,11 +182,13 @@ public final class GameStartCoordinator {
         if (!teleported) {
             return false;
         }
-        onlineParticipants.forEach(player -> {
+        for (Player player : onlineParticipants) {
+            if (gameManager.activeSession().orElse(null) != session || session.state() != SessionState.COUNTDOWN) return false;
             playerReset.reset(player);
             pendingPlayers.completeReset(player.getUniqueId());
             blindness.discard(player.getUniqueId());
-        });
+        }
+        if (gameManager.activeSession().orElse(null) != session || session.state() != SessionState.COUNTDOWN) return false;
         session.participants().forEach(participant -> {
             if (server.getPlayer(participant.id()) == null
                     || !server.getPlayer(participant.id()).isOnline()) {

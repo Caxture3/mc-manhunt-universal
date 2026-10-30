@@ -36,7 +36,7 @@ dependencies.add("testRuntimeOnly", catalog.findLibrary("junit-platform-launcher
 tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 // Compile against and embed the pure Java modules; no separate runtime installation needed.
-for (module in listOf(":common", ":protocol")) {
+for (module in listOf(":common", ":protocol", ":api", ":api-paper")) {
     evaluationDependsOn(module)
     dependencies.add("implementation", dependencies.project(module))
     val moduleOutput = project(module).extensions.getByType<SourceSetContainer>()["main"].output

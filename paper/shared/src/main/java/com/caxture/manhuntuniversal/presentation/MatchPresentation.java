@@ -12,6 +12,8 @@ public interface MatchPresentation {
 
     void showStart(GameSession session);
 
+    default void showRolesChanged(GameSession session) {}
+
     void showStatus(CommandSender recipient, GameSession session, int countdownSeconds, Instant now);
 
     void showIdleStatus(CommandSender recipient);

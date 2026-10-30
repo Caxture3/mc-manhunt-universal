@@ -19,7 +19,7 @@ final class ResultReportComposer {
         if (hideRoles) {
             return new Report("game.result.hidden-report", Map.of(
                     "winner", localizer.text(winnerKey(result.winner()), Map.of()),
-                    "reason", localizer.text(resultReasonKey(result.reason()), Map.of())));
+                    "reason", reasonText(result, localizer)));
         }
         String killerSection = result.killer()
                 .map(killer -> localizer.text("game.result.killer-section", Map.of(
@@ -28,7 +28,7 @@ final class ResultReportComposer {
 
         return new Report("game.result.full-report", Map.of(
                 "winner", localizer.text(winnerKey(result.winner()), Map.of()),
-                "reason", localizer.text(resultReasonKey(result.reason()), Map.of()),
+                "reason", reasonText(result, localizer),
                 "runners", MatchTextFormatter.names(result.participants(), result.runners()),
                 "hunters", MatchTextFormatter.names(result.participants(), result.hunters()),
                 "killer-section", killerSection));
@@ -43,7 +43,13 @@ final class ResultReportComposer {
             case RUNNER_DIED -> "reason.runner-died";
             case ENDER_DRAGON_DEFEATED -> "reason.dragon-defeated";
             case ENDER_DRAGON_ABSENT -> "reason.dragon-absent";
+            case CUSTOM -> "reason.extension-finished";
         };
+    }
+
+    private static String reasonText(GameResult result, Localizer localizer) {
+        return result.reason() == GameResultReason.CUSTOM && !result.customReason().isBlank()
+                ? result.customReason() : localizer.text(resultReasonKey(result.reason()), Map.of());
     }
 
     @FunctionalInterface

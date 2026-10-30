@@ -14,6 +14,9 @@ import com.caxture.manhuntuniversal.listener.GameEventListener;
 import com.caxture.manhuntuniversal.optimization.HunterEndAccessListener;
 import com.caxture.manhuntuniversal.optimization.OreFortuneListener;
 import com.caxture.manhuntuniversal.optimization.PiglinBarterListener;
+import com.caxture.manhuntuniversal.extension.PaperExtensionService;
+import com.caxture.manhuntuniversal.api.ManhuntUniversalApi;
+import com.caxture.manhuntuniversal.api.paper.PaperManhuntUniversalApi;
 import com.caxture.manhuntuniversal.player.CountdownBlindnessService;
 import com.caxture.manhuntuniversal.player.PendingPlayerState;
 import com.caxture.manhuntuniversal.player.PlayerResetService;
@@ -29,6 +32,7 @@ import com.caxture.manhuntuniversal.tracking.TrackingCompassListener;
 import com.caxture.manhuntuniversal.tracking.TrackingSelectionTargetMapper;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.ServicePriority;
 
 import java.time.Clock;
 import java.util.Objects;
@@ -38,6 +42,7 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
     private ActiveGameCoordinator activeGame;
     private PaperTrackingClientPublisher clientPublisher;
     private IdentityDisplayService identity;
+    private PaperExtensionService extensionApi;
 
     @Override
     public void onEnable() {
@@ -92,6 +97,12 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
         GameStartCoordinator gameStart = new GameStartCoordinator(
                 getServer(), gameManager, configuration, language, pendingPlayers,
                 blindness, playerReset, activeGame, tracking, clock);
+        extensionApi = new PaperExtensionService(this, gameManager, gameStart, activeGame, clock);
+        activeGame.setExtensionHooks(extensionApi);
+        gameManager.onVictoryDecision(extensionApi::decidingVictory);
+        getServer().getServicesManager().register(ManhuntUniversalApi.class, extensionApi, this, ServicePriority.Normal);
+        getServer().getServicesManager().register(PaperManhuntUniversalApi.class, extensionApi, this, ServicePriority.Normal);
+        getServer().getPluginManager().registerEvents(extensionApi, this);
         MhuCommand handler = new MhuCommand(
                 gameManager, gameStart, activeGame, configuration, language, presentation, teamPresenter, clock);
         PluginCommand command = Objects.requireNonNull(getCommand("mhu"), "mhu command is missing");
@@ -112,14 +123,19 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (activeGame != null) {
-            activeGame.disable();
-        }
-        if (identity != null) {
-            identity.clearLobbyPreviews();
-        }
-        if (clientPublisher != null) {
-            clientPublisher.shutdown();
+        try {
+            if (activeGame != null) activeGame.disable();
+        } finally {
+            try {
+                if (extensionApi != null) extensionApi.shutdown();
+                getServer().getServicesManager().unregisterAll(this);
+            } finally {
+                try {
+                    if (identity != null) identity.clearLobbyPreviews();
+                } finally {
+                    if (clientPublisher != null) clientPublisher.shutdown();
+                }
+            }
         }
     }
 }

@@ -8,7 +8,7 @@ pluginManagement {
 
 rootProject.name = "mc-manhunt-universal"
 
-include("common", "protocol")
+include("common", "protocol", "api", "api-paper")
 
 val supportedVersions = listOf("1.21.11", "26.3")
 val selectedVersion = providers.gradleProperty("mcVersion").orNull

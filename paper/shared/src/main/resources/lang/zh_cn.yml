@@ -3,10 +3,13 @@ identity:
   runner: "§c速通者"
   hunter: "§b猎人"
 command:
+  busy: "{prefix}§e对局正在处理状态变更，请稍后重试。"
   no-permission: "{prefix}§c你没有权限执行该指令。"
   usage: "{prefix}§e用法：/mhu <join [hunter|runner|random]|start [1-60秒]|status|stop|config>"
   unknown: "{prefix}§c未知的子指令。"
 game:
+  roles:
+    changed-title: "§e角色已重新分配"
   start:
     usage: "{prefix}§e用法：/mhu start [1-60秒]"
     countdown-not-integer: "{prefix}§c倒计时秒数必须是整数。"
@@ -57,7 +60,7 @@ config:
   name:
     force-random-roles: "强制随机分配角色"
     hide-role-assignments: "隐藏角色分配"
-    ore-fortune-level: "矿物虚拟时运等级"
+    ore-fortune-level: "矿物爆率等级 (0~5)"
     adjust-piglin-bartering: "优化猪灵交易"
     hunter-end-restriction-enabled: "速通者先进入末地"
     runner-count: "速通者人数"
@@ -92,6 +95,7 @@ restriction:
   hunter-end-locked: "{prefix}§c速通者尚未进入末地，猎人暂时不能放置末影之眼或进入末地。"
   blaze-spawner-break-denied: "{prefix}§c不能破坏烈焰人刷怪笼。"
 reason:
+  extension-finished: "扩展玩法结算"
   runner-died: "所有速通者已淘汰"
   dragon-defeated: "末影龙被击杀"
   dragon-absent: "目标末地没有末影龙"

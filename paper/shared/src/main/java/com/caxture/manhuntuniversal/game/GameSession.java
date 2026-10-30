@@ -17,12 +17,13 @@ public final class GameSession {
     private final Map<UUID, Participant> participantsById;
     private MatchSettings settings;
     private final List<RunnerRound> roundHistory = new ArrayList<>();
-    private final List<UUID> runnerIds;
-    private final Set<UUID> eliminatedRunners = new LinkedHashSet<>();
+    private List<UUID> runnerIds;
+    private final Set<UUID> eliminatedParticipants = new LinkedHashSet<>();
     private SessionState state = SessionState.COUNTDOWN;
     private Instant startedAt;
     private Instant currentRoundStartedAt;
     private UUID targetEndWorldId;
+    private long revision;
 
     GameSession(
             UUID id,
@@ -74,19 +75,47 @@ public final class GameSession {
     }
 
     public List<UUID> livingRunnerIds() {
-        return runnerIds.stream().filter(id -> !eliminatedRunners.contains(id)).toList();
+        return runnerIds.stream().filter(id -> !eliminatedParticipants.contains(id)).toList();
+    }
+
+    public long revision() { return revision; }
+
+    public boolean isEliminatedParticipant(UUID playerId) { return eliminatedParticipants.contains(playerId); }
+
+    public List<UUID> livingHunterIds() {
+        return hunterIds().stream().filter(id -> !isEliminatedParticipant(id)).toList();
     }
 
     public boolean isEliminatedRunner(UUID playerId) {
-        return eliminatedRunners.contains(playerId);
+        return runnerIds.contains(playerId) && eliminatedParticipants.contains(playerId);
     }
 
     public boolean isRunnerAlive(UUID playerId) {
-        return runnerIds.contains(playerId) && !eliminatedRunners.contains(playerId);
+        return runnerIds.contains(playerId) && !eliminatedParticipants.contains(playerId);
     }
 
     boolean eliminateRunner(UUID playerId) {
-        return runnerIds.contains(playerId) && eliminatedRunners.add(playerId);
+        return runnerIds.contains(playerId) && eliminateParticipant(playerId);
+    }
+
+    boolean eliminateParticipant(UUID playerId) {
+        if (!participantsById.containsKey(playerId) || !eliminatedParticipants.add(playerId)) return false;
+        revision++;
+        return true;
+    }
+
+    boolean reviveParticipant(UUID playerId) {
+        if (!eliminatedParticipants.remove(playerId)) return false;
+        revision++;
+        return true;
+    }
+
+    void assignRunners(List<UUID> runners, Instant at) {
+        if (runnerIds.equals(runners)) return;
+        closeCurrentRound(at, TerminationReason.ROLES_CHANGED);
+        runnerIds = List.copyOf(runners);
+        currentRoundStartedAt = at;
+        revision++;
     }
 
     public Optional<Role> roleOf(UUID playerId) {
@@ -112,6 +141,7 @@ public final class GameSession {
         state = SessionState.RUNNING;
         startedAt = at;
         currentRoundStartedAt = at;
+        revision++;
     }
 
     void refreshTrackingSettings(TrackingSettingsSnapshot trackingSettings) {
@@ -126,6 +156,7 @@ public final class GameSession {
             return false;
         }
         targetEndWorldId = worldId;
+        revision++;
         return true;
     }
 
@@ -134,6 +165,7 @@ public final class GameSession {
             closeCurrentRound(at, reason);
         }
         state = SessionState.SETTLING;
+        revision++;
     }
 
     private void closeCurrentRound(Instant at, TerminationReason reason) {

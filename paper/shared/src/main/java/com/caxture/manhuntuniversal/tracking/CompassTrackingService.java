@@ -106,6 +106,7 @@ public final class CompassTrackingService {
             }
         }
         tick(session);
+        if (gameManager.activeSession().orElse(null) != session || session.state() != SessionState.RUNNING) return;
         searchTicker = server.getScheduler().runTaskTimer(plugin, this::runSearchTick, 1L, 1L);
     }
 
@@ -292,7 +293,7 @@ public final class CompassTrackingService {
         GameSession session = runningSession().orElse(null);
         boolean participant = session != null
                 && session.participant(player.getUniqueId()).isPresent()
-                && !session.isEliminatedRunner(player.getUniqueId());
+                && !session.isEliminatedParticipant(player.getUniqueId());
         boolean stateMatches = session != null && state != null
                 && state.sessionId().equals(session.id());
         if (TrackingAccessPolicy.cleanupRequired(
@@ -336,7 +337,7 @@ public final class CompassTrackingService {
         GameSession session = runningSession().orElse(null);
         return session != null
                 && session.participant(player.getUniqueId()).isPresent()
-                && !session.isEliminatedRunner(player.getUniqueId())
+                && !session.isEliminatedParticipant(player.getUniqueId())
                 && state != null
                 && state.sessionId().equals(session.id())
                 && !pendingPlayers.needsReset(player.getUniqueId());
@@ -351,7 +352,7 @@ public final class CompassTrackingService {
             GameSession session = runningSession().orElse(null);
             if (session != null
                     && session.participant(player.getUniqueId()).isPresent()
-                    && !session.isEliminatedRunner(player.getUniqueId())
+                    && !session.isEliminatedParticipant(player.getUniqueId())
                     && !pendingPlayers.needsReset(player.getUniqueId())) {
                 ensureCompass(session, player,
                         expectedKind(session, player.getUniqueId()).orElse(null));
@@ -929,7 +930,7 @@ public final class CompassTrackingService {
     }
 
     private Optional<TrackingCompassKind> expectedKind(GameSession session, UUID playerId) {
-        if (session.isEliminatedRunner(playerId)) return Optional.empty();
+        if (session.isEliminatedParticipant(playerId)) return Optional.empty();
         Role role = session.roleOf(playerId).orElse(null);
         if (role == Role.RUNNER
                 && configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED)) {

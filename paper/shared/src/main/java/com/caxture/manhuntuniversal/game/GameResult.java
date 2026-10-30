@@ -15,7 +15,8 @@ public record GameResult(
         List<UUID> hunters,
         List<RunnerRound> roundHistory,
         Optional<UUID> deadRunner,
-        Optional<UUID> killer
+        Optional<UUID> killer,
+        String customReason
 ) {
     public GameResult {
         participants = List.copyOf(participants);
@@ -24,5 +25,12 @@ public record GameResult(
         roundHistory = List.copyOf(roundHistory);
         deadRunner = deadRunner == null ? Optional.empty() : deadRunner;
         killer = killer == null ? Optional.empty() : killer;
+        customReason = customReason == null ? "" : customReason;
+    }
+
+    public GameResult(UUID sessionId, GameWinner winner, GameResultReason reason, Instant settledAt,
+                      List<Participant> participants, List<UUID> runners, List<UUID> hunters,
+                      List<RunnerRound> roundHistory, Optional<UUID> deadRunner, Optional<UUID> killer) {
+        this(sessionId, winner, reason, settledAt, participants, runners, hunters, roundHistory, deadRunner, killer, "");
     }
 }

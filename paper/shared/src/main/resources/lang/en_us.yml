@@ -3,10 +3,13 @@ identity:
   runner: "§cSpeedrunner"
   hunter: "§bHunter"
 command:
+  busy: "{prefix}§eA match state change is in progress; please try again shortly."
   no-permission: "{prefix}§cYou do not have permission to use this command."
   usage: "{prefix}§eUsage: /mhu <join [hunter|runner|random]|start [1-60 seconds]|status|stop|config>"
   unknown: "{prefix}§cUnknown subcommand."
 game:
+  roles:
+    changed-title: "§eRoles Reassigned"
   start:
     usage: "{prefix}§eUsage: /mhu start [1-60 seconds]"
     countdown-not-integer: "{prefix}§cThe countdown must be an integer."
@@ -92,6 +95,7 @@ restriction:
   hunter-end-locked: "{prefix}§cA living speedrunner must enter the End before hunters can insert Eyes of Ender or enter the End."
   blaze-spawner-break-denied: "{prefix}§cBlaze spawners cannot be broken."
 reason:
+  extension-finished: "Extension match result"
   runner-died: "All speedrunners eliminated"
   dragon-defeated: "Ender Dragon defeated"
   dragon-absent: "No Ender Dragon in the target End"
