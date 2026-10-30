@@ -59,6 +59,11 @@ public final class CompassTrackingService {
     private final org.bukkit.NamespacedKey sessionKey;
     private final org.bukkit.NamespacedKey kindKey;
     private final TrackingSearchQueue searchQueue = new TrackingSearchQueue();
+    private final SharedSearchCache<StructureSearchKey, PortalPoint> sharedStructures = new SharedSearchCache<>(
+            512, 300_000_000_000L, 15_000_000_000L, System::nanoTime, searchQueue::invalidate);
+    private final PortalSearchEngine portalEngine;
+    private final PortalInvalidationBuffer pendingPortalChanges = new PortalInvalidationBuffer();
+    private long searchCycle;
     // Retained through finish/start for same-match role reassignment; holds no player/world objects.
     private final StructureUnlockAnnouncements unlockAnnouncements = new StructureUnlockAnnouncements();
     private final TrackingSelectionAuthorizationRegistry selectionAuthorizations =
@@ -91,6 +96,13 @@ public final class CompassTrackingService {
         this.selectionPresenter = selectionPresenter;
         this.pendingPlayers = pendingPlayers;
         this.clock = clock;
+        this.portalEngine = new PortalSearchEngine((worldId, chunkX, chunkZ) -> {
+            World world = server.getWorld(worldId);
+            if (world == null) throw new IllegalStateException("Portal search world has unloaded: " + worldId);
+            return PortalLocator.readChunk(world, chunkX, chunkZ);
+        }, task -> server.getScheduler().runTaskAsynchronously(plugin, task), System::nanoTime,
+                exception -> plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Portal tracking query failed", exception));
         // Keep existing bound-item identifiers independent of the plugin's display name.
         this.markerKey = new org.bukkit.NamespacedKey(ProtocolNamespace.NAMESPACE, "tracking_compass");
         this.sessionKey = new org.bukkit.NamespacedKey(ProtocolNamespace.NAMESPACE, "tracking_session");
@@ -246,6 +258,7 @@ public final class CompassTrackingService {
 
     public void playerQuit(Player player) {
         recordCurrentPosition(player);
+        invalidateParticipant(player.getUniqueId());
         selectionAuthorizations.invalidate(player.getUniqueId());
         selectionPresenter.invalidate(player.getUniqueId());
         clearActionBar(player);
@@ -560,20 +573,42 @@ public final class CompassTrackingService {
                 ? previous.result() : null;
         staticSearches.put(player.getUniqueId(), new StaticSearchState(
                 target, world.getUID(), origin, oldResult, now, true, token));
+        StructureSearchKey key = new StructureSearchKey(world.getUID(), target,
+                origin.getX(), origin.getY(), origin.getZ(), searchRadiusChunks());
+        var work = sharedStructures.request(player.getUniqueId(), key, result -> {
+            World liveWorld = server.getWorld(key.worldId());
+            if (liveWorld != null) completeStatic(token, origin,
+                    result.map(point -> location(liveWorld, point)).orElse(null), Instant.now(clock));
+        });
+        if (work == null) return;
         TrackingSearchQueue.Request request = searchQueue.replace(
-                player.getUniqueId(), TrackingSearchQueue.Lane.STATIC);
+                work.id(), TrackingSearchQueue.Lane.STATIC);
         if (target == TrackingTargetId.VILLAGE) {
-            VillageAccumulator accumulator = new VillageAccumulator(token, origin, now);
+            VillageAccumulator accumulator = new VillageAccumulator(work, origin);
             for (Structure village : VILLAGES) {
                 searchQueue.add(
                         request,
-                        () -> locateVillagePart(world, village, accumulator));
+                        () -> runStructureStep(work, world, () -> locateVillagePart(world, village, accumulator)));
             }
             return;
         }
         searchQueue.add(
                 request,
-                () -> completeSingleSearch(world, target, token, origin, now));
+                () -> runStructureStep(work, world, () -> completeSingleSearch(world, target, work, origin)));
+    }
+
+    private void runStructureStep(SharedSearchCache<StructureSearchKey, PortalPoint>.Work work,
+                                  World world, Runnable step) {
+        if (!work.active()) return;
+        if (server.getWorld(world.getUID()) != world) {
+            work.fail();
+            return;
+        }
+        try { step.run(); }
+        catch (RuntimeException exception) {
+            work.fail();
+            plugin.getLogger().log(java.util.logging.Level.WARNING, "Structure tracking query failed", exception);
+        }
     }
 
     private void locateVillagePart(
@@ -581,11 +616,11 @@ public final class CompassTrackingService {
             Structure village,
             VillageAccumulator accumulator
     ) {
-        if (!state.isCurrent(accumulator.token())) {
+        if (!accumulator.work().active()) {
             return;
         }
         var result = world.locateNearestStructure(
-                accumulator.origin(), village, searchRadiusChunks(), false);
+                accumulator.origin(), village, accumulator.work().key().radiusChunks(), false);
         if (result != null) {
             Location location = result.getLocation();
             if (accumulator.best() == null
@@ -595,30 +630,28 @@ public final class CompassTrackingService {
             }
         }
         accumulator.completeOne();
-        if (accumulator.remaining() == 0 && state.isCurrent(accumulator.token())) {
-            completeStatic(
-                    accumulator.token(), accumulator.origin(), accumulator.best(), accumulator.at());
+        if (accumulator.remaining() == 0) {
+            accumulator.work().complete(Optional.ofNullable(accumulator.best()).map(CompassTrackingService::point));
         }
     }
 
     private void completeSingleSearch(
             World world,
             TrackingTargetId target,
-            TrackingSearchToken token,
-            Location origin,
-            Instant now
+            SharedSearchCache<StructureSearchKey, PortalPoint>.Work work,
+            Location origin
     ) {
-        if (!state.isCurrent(token)) {
+        if (!work.active()) {
             return;
         }
         Location result = switch (target) {
             case NETHER_FORTRESS -> locationOf(world.locateNearestStructure(
-                    origin, Structure.FORTRESS, searchRadiusChunks(), false));
+                    origin, Structure.FORTRESS, work.key().radiusChunks(), false));
             case BASTION_REMNANT -> locationOf(world.locateNearestStructure(
-                    origin, Structure.BASTION_REMNANT, searchRadiusChunks(), false));
+                    origin, Structure.BASTION_REMNANT, work.key().radiusChunks(), false));
             default -> null;
         };
-        completeStatic(token, origin, result, now);
+        work.complete(Optional.ofNullable(result).map(CompassTrackingService::point));
     }
 
     private void completeStatic(
@@ -627,7 +660,7 @@ public final class CompassTrackingService {
             Location result,
             Instant searchedAt
     ) {
-        if (!state.isCurrent(token)) {
+        if (state == null || !state.isCurrent(token)) {
             return;
         }
         staticSearches.put(token.playerId(), new StaticSearchState(
@@ -653,29 +686,32 @@ public final class CompassTrackingService {
         }
         long version = ++portalVersion;
         Location origin = player.getLocation().clone();
-        Location oldResult = portal != null
+        Location oldResult = !invalidPortal && portal != null
                 && portal.worldId().equals(player.getWorld().getUID())
                 ? portal.result() : null;
+        if (invalidPortal) portalBlocksChanged(player.getWorld(),
+                portal.result().getBlockX(), portal.result().getBlockZ());
         PortalSearchState requested = new PortalSearchState(
                 player.getWorld().getUID(), origin, oldResult, now, true, version);
         portalSearches.put(player.getUniqueId(), requested);
         UUID playerId = player.getUniqueId();
-        World world = player.getWorld();
-        TrackingSearchQueue.Request request = searchQueue.replace(
-                playerId, TrackingSearchQueue.Lane.PORTAL);
-        searchQueue.add(request, () -> {
-            PortalSearchState currentRequest = portalSearches.get(playerId);
-            if (currentRequest == null || currentRequest.version() != version) {
-                return;
-            }
-            Location found = PortalLocator.findNearest(world, origin, settings.searchRadiusBlocks());
+        UUID worldId = player.getWorld().getUID();
+        portalEngine.request(playerId, new PortalSearchEngine.Query(worldId, point(origin),
+                settings.searchRadiusBlocks()), result -> {
             PortalSearchState stillCurrent = portalSearches.get(playerId);
-            if (stillCurrent != null && stillCurrent.version() == version) {
+            World liveWorld = server.getWorld(worldId);
+            if (liveWorld != null && stillCurrent != null && stillCurrent.version() == version) {
+                Location found = result.map(value -> location(liveWorld, value)).orElse(null);
+                if (found != null && liveWorld.isChunkLoaded(found.getBlockX() >> 4, found.getBlockZ() >> 4)
+                        && found.getBlock().getType() != Material.NETHER_PORTAL) {
+                    portalBlocksChanged(liveWorld, found.getBlockX(), found.getBlockZ());
+                    found = null;
+                }
                 portalSearches.put(playerId, new PortalSearchState(
-                        world.getUID(), origin, found, now, false, version));
+                        worldId, origin, found, Instant.now(clock), false, version));
             }
         });
-        return requested;
+        return portalSearches.get(playerId);
     }
 
     private World chooseTargetWorld(Player player, TrackingWorldKind kind) {
@@ -1007,7 +1043,7 @@ public final class CompassTrackingService {
         }
         staticSearches.remove(playerId);
         desiredTargets.remove(playerId);
-        searchQueue.invalidate(playerId, TrackingSearchQueue.Lane.STATIC);
+        sharedStructures.cancel(playerId);
     }
 
     private void invalidateParticipant(UUID playerId) {
@@ -1017,11 +1053,51 @@ public final class CompassTrackingService {
         staticSearches.remove(playerId);
         portalSearches.remove(playerId);
         desiredTargets.remove(playerId);
-        searchQueue.invalidate(playerId);
+        sharedStructures.cancel(playerId);
+        portalEngine.cancel(playerId);
+    }
+
+    /** Coalesces physics/create/break events and waits for vanilla POI updates before invalidation. */
+    public void portalBlocksChanged(World world, int blockX, int blockZ) {
+        if (state == null) return;
+        int chunkX = blockX >> 4;
+        int chunkZ = blockZ >> 4;
+        for (int x = -1; x <= 1; x++) for (int z = -1; z <= 1; z++) {
+            pendingPortalChanges.mark(world.getUID(), chunkX + x, chunkZ + z, searchCycle);
+        }
+    }
+
+    public void worldUnloaded(UUID worldId) {
+        Set<UUID> affected = new HashSet<>();
+        staticSearches.forEach((id, search) -> { if (search.worldId().equals(worldId)) affected.add(id); });
+        portalSearches.forEach((id, search) -> { if (search.worldId().equals(worldId)) affected.add(id); });
+        affected.forEach(this::invalidateParticipant);
+        sharedStructures.invalidateMatching(key -> key.worldId().equals(worldId));
+        portalEngine.invalidateWorld(worldId);
+        pendingPortalChanges.removeWorld(worldId);
+    }
+
+    private void flushPortalChanges() {
+        boolean changed = false;
+        for (var entry : pendingPortalChanges.drain(searchCycle).entrySet()) {
+            UUID worldId = entry.getKey();
+            for (UUID playerId : List.copyOf(portalSearches.keySet())) {
+                if (portalSearches.get(playerId).worldId().equals(worldId)) {
+                    portalSearches.remove(playerId);
+                    portalEngine.cancel(playerId);
+                }
+            }
+            portalEngine.invalidateChunks(worldId, entry.getValue());
+            changed = true;
+        }
+        if (changed) runningSession().ifPresent(this::tick);
     }
 
     private void runSearchTick() {
+        searchCycle++;
+        flushPortalChanges();
         searchQueue.runOne();
+        portalEngine.tick();
         searchTicks++;
         if (searchTicks >= 20) {
             searchTicks = 0;
@@ -1048,6 +1124,10 @@ public final class CompassTrackingService {
     }
 
     private void clearRuntimeState() {
+        sharedStructures.clear();
+        portalEngine.clear();
+        pendingPortalChanges.clear();
+        searchCycle = 0;
         searchQueue.clear();
         staticSearches.clear();
         portalSearches.clear();
@@ -1101,6 +1181,14 @@ public final class CompassTrackingService {
         return result == null ? null : result.getLocation();
     }
 
+    private static PortalPoint point(Location location) {
+        return new PortalPoint(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    }
+
+    private static Location location(World world, PortalPoint point) {
+        return new Location(world, point.x(), point.y(), point.z());
+    }
+
     private static double horizontalDistance(Location first, Location second) {
         double x = first.getX() - second.getX();
         double z = first.getZ() - second.getZ();
@@ -1136,29 +1224,26 @@ public final class CompassTrackingService {
     ) {
     }
 
+    private record StructureSearchKey(UUID worldId, TrackingTargetId target,
+                                      double x, double y, double z, int radiusChunks) {}
+
     private static final class VillageAccumulator {
-        private final TrackingSearchToken token;
+        private final SharedSearchCache<StructureSearchKey, PortalPoint>.Work work;
         private final Location origin;
-        private final Instant at;
         private int remaining = VILLAGES.size();
         private Location best;
 
-        private VillageAccumulator(TrackingSearchToken token, Location origin, Instant at) {
-            this.token = token;
+        private VillageAccumulator(SharedSearchCache<StructureSearchKey, PortalPoint>.Work work, Location origin) {
+            this.work = work;
             this.origin = origin;
-            this.at = at;
         }
 
-        TrackingSearchToken token() {
-            return token;
+        SharedSearchCache<StructureSearchKey, PortalPoint>.Work work() {
+            return work;
         }
 
         Location origin() {
             return origin;
-        }
-
-        Instant at() {
-            return at;
         }
 
         int remaining() {

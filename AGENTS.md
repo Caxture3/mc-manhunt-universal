@@ -12,6 +12,7 @@
 - 可选优化仅 RUNNING 生效：`ore-fortune-level=0`（0–10，虚拟工具查询原版矿物掉落，不修改玩家工具）、`adjust-piglin-bartering=false`（单结果，64 金期望 16 珍珠/10 黑曜石/3 普通与喷溅抗火，其他结果保持相对比例）、`hunter-end-restriction-enabled=false`（存活速通者实际进入末地后本局永久解锁猎人放眼和进入限制）。
 - `runner-structure-tracker-unlock-time` 为 village/bastion_remnant/nether_fortress 的单个配置映射，整数秒默认均 0，-1 禁用。按正式 startedAt 计时，修改即时重算；全禁用不发速通者指南针，猎人指南针不受影响。禁用项隐藏、锁定项不可选择，服务端独立校验授权与解锁；Fabric 剩余选项等宽、中心倒计时且锁定不 hover 提亮，原版 Dialog 同步倒计时并正确处理 Esc。
 - 结构选择协议升级至 2，频道和 Mod ID 仍保留；旧模组或旧服务端不匹配时回退 Paper Dialog。公共 API/SDK 仍为 1.0.0，已保存的 API 1.1 标准暂不实施。
+- 追踪性能：静态结构精确输入共享缓存/合并，原版定位仍同步；传送门 POI 按列主线程读取（含未加载区块 POI，不生成方块区块），全局每 tick 最多 64 列/2ms 软预算，后台只筛选不可变坐标。保留三维最近与配置半径；共享订阅取消、门变化后每列静默2tick失效、世界卸载及对局清理必须阻止过期提交。
 - README 面向公开 GitHub 仓库；顶部不写玩法功能清单或当前开发进度，不写本机参考工程绝对路径。
 - 迁移时保留原有行为、配置语义和通信协议；版本适配仅处理必要的 API / 映射差异。不得借迁移擅自设计新玩法或协议。
 - `common`、`protocol`、`api` 使用 Java 21，不得依赖 Bukkit、Paper、Fabric 或 Minecraft 类；`api-paper` 为 Java 21 的 Paper 服务和事件合同。

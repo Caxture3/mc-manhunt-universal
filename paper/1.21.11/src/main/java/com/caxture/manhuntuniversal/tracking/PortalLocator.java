@@ -1,17 +1,19 @@
 package com.caxture.manhuntuniversal.tracking;
 
-import org.bukkit.Location;
+import org.bukkit.Bukkit;
 import org.bukkit.World;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
- * Paper 1.21.11 has no public POI lookup API. Invoke the same vanilla nearest-POI
- * query through its Mojang-mapped runtime; never create portals or scan blocks.
- * Called by the existing main-thread tracking search queue.
+ * Reads one complete POI column through Paper's Mojang-mapped runtime.
+ * This may read stored POI data, but never loads or generates block chunks.
  */
 final class PortalLocator {
     private static final Bindings NMS = new Bindings();
@@ -19,26 +21,37 @@ final class PortalLocator {
     private PortalLocator() {
     }
 
-    static Location findNearest(World world, Location origin, int radius) {
+    /** Returns only immutable coordinates; no live NMS record or stream escapes. */
+    static List<PortalPoint> readChunk(World world, int chunkX, int chunkZ) {
+        if (!Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("Portal POI columns must be read on the server thread");
+        }
         try {
             Object level = NMS.worldHandle.invoke(world);
             Object manager = NMS.poiManager.invoke(level);
-            Object source = NMS.blockPos.newInstance(
-                    origin.getBlockX(), origin.getBlockY(), origin.getBlockZ());
-            Predicate<Object> portal = holder -> {
-                try {
-                    return (boolean) NMS.holderIs.invoke(holder, NMS.portalKey);
-                } catch (ReflectiveOperationException exception) {
-                    throw new IllegalStateException("Cannot match a portal POI on Paper 1.21.11", exception);
+            Object chunk = NMS.chunkPos.newInstance(chunkX, chunkZ);
+            Predicate<Object> portal = PortalLocator::isPortal;
+            try (Stream<?> records = (Stream<?>) NMS.getInChunk.invoke(
+                    manager, portal, chunk, NMS.anyOccupancy)) {
+                List<PortalPoint> snapshot = new ArrayList<>();
+                for (Iterator<?> iterator = records.iterator(); iterator.hasNext();) {
+                    Object position = NMS.recordPos.invoke(iterator.next());
+                    snapshot.add(new PortalPoint((int) NMS.x.invoke(position),
+                            (int) NMS.y.invoke(position), (int) NMS.z.invoke(position)));
                 }
-            };
-            Optional<?> result = (Optional<?>) NMS.findClosest.invoke(
-                    manager, portal, source, radius, NMS.anyOccupancy);
-            Object position = result.orElse(null);
-            return position == null ? null : new Location(world,
-                    (int) NMS.x.invoke(position), (int) NMS.y.invoke(position), (int) NMS.z.invoke(position));
+                return List.copyOf(snapshot);
+            }
         } catch (ReflectiveOperationException exception) {
-            throw new IllegalStateException("Cannot locate portal POIs on Paper 1.21.11", exception);
+            throw new IllegalStateException("Cannot read portal POIs on Paper 1.21.11 at "
+                    + chunkX + ", " + chunkZ, exception);
+        }
+    }
+
+    private static boolean isPortal(Object holder) {
+        try {
+            return (boolean) NMS.holderIs.invoke(holder, NMS.portalKey);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Cannot match a portal POI on Paper 1.21.11", exception);
         }
     }
 
@@ -46,10 +59,11 @@ final class PortalLocator {
     private static final class Bindings {
         private final Method worldHandle;
         private final Method poiManager;
-        private final Constructor<?> blockPos;
+        private final Constructor<?> chunkPos;
         private final Method holderIs;
         private final Object portalKey;
-        private final Method findClosest;
+        private final Method getInChunk;
+        private final Method recordPos;
         private final Object anyOccupancy;
         private final Method x;
         private final Method y;
@@ -58,17 +72,20 @@ final class PortalLocator {
         private Bindings() {
             try {
                 Class<?> position = Class.forName("net.minecraft.core.BlockPos");
+                Class<?> chunk = Class.forName("net.minecraft.world.level.ChunkPos");
                 Class<?> holder = Class.forName("net.minecraft.core.Holder");
                 Class<?> key = Class.forName("net.minecraft.resources.ResourceKey");
                 Class<?> manager = Class.forName("net.minecraft.world.entity.ai.village.poi.PoiManager");
                 Class<?> occupancy = Class.forName("net.minecraft.world.entity.ai.village.poi.PoiManager$Occupancy");
                 worldHandle = Class.forName("org.bukkit.craftbukkit.CraftWorld").getMethod("getHandle");
                 poiManager = Class.forName("net.minecraft.server.level.ServerLevel").getMethod("getPoiManager");
-                blockPos = position.getConstructor(int.class, int.class, int.class);
+                chunkPos = chunk.getConstructor(int.class, int.class);
                 holderIs = holder.getMethod("is", key);
                 portalKey = Class.forName("net.minecraft.world.entity.ai.village.poi.PoiTypes")
                         .getField("NETHER_PORTAL").get(null);
-                findClosest = manager.getMethod("findClosest", Predicate.class, position, int.class, occupancy);
+                getInChunk = manager.getMethod("getInChunk", Predicate.class, chunk, occupancy);
+                recordPos = Class.forName("net.minecraft.world.entity.ai.village.poi.PoiRecord")
+                        .getMethod("getPos");
                 anyOccupancy = occupancy.getField("ANY").get(null);
                 x = position.getMethod("getX");
                 y = position.getMethod("getY");

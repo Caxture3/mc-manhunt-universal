@@ -29,6 +29,7 @@ import com.caxture.manhuntuniversal.tracking.CompassTrackingService;
 import com.caxture.manhuntuniversal.tracking.FabricAwareTrackingSelectionPresenter;
 import com.caxture.manhuntuniversal.tracking.PaperDialogTrackingSelectionPresenter;
 import com.caxture.manhuntuniversal.tracking.TrackingCompassListener;
+import com.caxture.manhuntuniversal.tracking.PortalTrackingListener;
 import com.caxture.manhuntuniversal.tracking.TrackingSelectionTargetMapper;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -116,6 +117,7 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new GameEventListener(activeGame, gameManager, teamPresenter), this);
         getServer().getPluginManager().registerEvents(new TrackingCompassListener(tracking), this);
+        getServer().getPluginManager().registerEvents(new PortalTrackingListener(tracking), this);
         getServer().getPluginManager().registerEvents(clientPublisher, this);
         getServer().getPluginManager().registerEvents(
                 new BlazeSpawnerProtectionListener(language, gameManager, configuration), this);

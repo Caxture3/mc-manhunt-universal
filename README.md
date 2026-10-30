@@ -104,7 +104,7 @@ gradle/                 Wrapper、版本目录、公共构建配置
 docs/                   使用说明、设计与验证记录
 ```
 
-每个版本模块使用 Gradle 默认的 `src/main/java`、`src/main/resources`；Fabric 另有 `src/client/java`。Paper 仅传送门 POI 查询有版本适配：26.3 沿用原 API，1.21.11 在原同步队列中桥接原版 POI 查询。Fabric 将渲染、输入、网络注册和 shader 差异放在版本目录，其余源码和素材共享。
+每个版本模块使用 Gradle 默认的 `src/main/java`、`src/main/resources`；Fabric 另有 `src/client/java`。Paper 的按列 POI 读取放在版本适配目录，共享调度器分批读取并异步筛选坐标。Fabric 将渲染、输入、网络注册和 shader 差异放在版本目录，其余源码和素材共享。
 
 ## 构建产物
 
