@@ -51,7 +51,23 @@ class RunnerSpectatorServiceTest {
         manager.clearSettled(session.id());
         drain();
         assertEquals(GameMode.ADVENTURE, player.mode);
-        assertTrue(manager.teamSelections().snapshot().isEmpty());
+        assertEquals(TeamPreference.RUNNER,manager.teamSelections().preferenceOf(first));
+    }
+
+    @Test void restartKeepsTheEliminationAndItsOriginalModeUntilLaterSettlement() {
+        GameSession session=start();PlayerState player=player(first,GameMode.CREATIVE);eliminate(session,player);drain();
+        var savedModes=spectators.snapshot();var reboot=new GameManager(new RoleAssigner(new Random(2)));assertTrue(reboot.restore(session.snapshot()));
+        var resumed=new RunnerSpectatorService(server,reboot,tasks::addLast);resumed.restoreSnapshot(savedModes);
+        resumed.joined(player.player);drain();assertEquals(GameMode.SPECTATOR,player.mode);assertTrue(reboot.activeSession().orElseThrow().isEliminatedParticipant(first));
+        reboot.cancel(session.id(),TerminationReason.ADMIN_STOPPED,Instant.EPOCH);resumed.finish(session.id());
+        assertEquals(GameMode.CREATIVE,player.mode);assertTrue(resumed.snapshot().isEmpty());
+    }
+
+    @Test void offlineRestorationDebtSurvivesRestartEvenAfterTheGameHasEnded() {
+        GameSession session=start();PlayerState player=player(first,GameMode.ADVENTURE);eliminate(session,player);drain();player.online=false;
+        manager.cancel(session.id(),TerminationReason.ADMIN_STOPPED,Instant.EPOCH);spectators.finish(session.id());manager.clearSettled(session.id());
+        var resumed=new RunnerSpectatorService(server,new GameManager(new RoleAssigner(new Random(3))),tasks::addLast);resumed.restoreSnapshot(spectators.snapshot());
+        player.online=true;resumed.joined(player.player);assertEquals(GameMode.ADVENTURE,player.mode);assertTrue(resumed.snapshot().isEmpty());
     }
 
     @Test

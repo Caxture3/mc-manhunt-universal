@@ -31,6 +31,8 @@ public final class BlazeSpawnerProtectionListener implements Listener {
                 || !SpawnerProtection.isProtected(event.getBlock().getType(), spawner.getSpawnedType(), running, allowed)) {
             return;
         }
+        if (!configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.BLAZE_SPAWNER_PROTECTION,
+                event.getPlayer(), event.getBlock().getLocation(), "block-break")) return;
         event.setCancelled(true);
         language.send(event.getPlayer(), "restriction.blaze-spawner-break-denied");
     }

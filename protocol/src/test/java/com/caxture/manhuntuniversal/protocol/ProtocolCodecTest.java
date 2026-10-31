@@ -14,9 +14,9 @@ class ProtocolCodecTest {
 
     @Test
     void helloRetainsItsWireShapeAndExposesVersionMismatchToNegotiation() {
-        assertArrayEquals(new byte[]{1, 0, 0, 0, 2},
+        assertArrayEquals(new byte[]{1, 0, 0, 0, 3},
                 ProtocolCodec.encode(new ClientHello(ProtocolConstants.VERSION)));
-        assertArrayEquals(new byte[]{2, 0, 0, 0, 2, 0},
+        assertArrayEquals(new byte[]{2, 0, 0, 0, 3, 0},
                 ProtocolCodec.encode(new ServerHello(ProtocolConstants.VERSION, false)));
         assertEquals(new ClientHello(1), ProtocolCodec.decode(new byte[]{1, 0, 0, 0, 1}));
         assertEquals(new ServerHello(1, false),
@@ -104,7 +104,7 @@ class ProtocolCodecTest {
         ByteBuffer.wrap(invalidAuthorization).putLong(21, 0);
         assertThrows(ProtocolException.class, () -> ProtocolCodec.decode(invalidAuthorization));
         assertThrows(ProtocolException.class, () -> ProtocolCodec.decode(null));
-        assertThrows(ProtocolException.class, () -> ProtocolCodec.decode(new byte[1025]));
+        assertThrows(ProtocolException.class, () -> ProtocolCodec.decode(new byte[ProtocolConstants.MAX_PAYLOAD_BYTES + 1]));
         assertThrows(ProtocolException.class, () -> ProtocolCodec.decode(new byte[]{127}));
     }
 }

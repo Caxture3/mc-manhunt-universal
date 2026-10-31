@@ -14,6 +14,7 @@ prevent-nether-portal-destruction: false
 ore-fortune-level: 0
 blaze-rod-looting-level: 0
 adjust-piglin-bartering: false
+disable-piglin-brutes: false
 hunter-end-restriction-enabled: false
 tracking-retarget-distance-blocks: 512
 tracking-retarget-cooldown-seconds: 30

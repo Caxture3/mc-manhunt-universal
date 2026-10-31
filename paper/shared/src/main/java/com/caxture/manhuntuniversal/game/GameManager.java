@@ -55,6 +55,13 @@ public final class GameManager {
         return Optional.ofNullable(activeSession);
     }
 
+    public synchronized boolean restore(SessionSnapshot saved) {
+        if (activeSession != null) return false;
+        GameSession restored=GameSession.restore(Objects.requireNonNull(saved));
+        activeSession=restored;
+        return true;
+    }
+
     public TeamSelectionService teamSelections() {
         return teamSelections;
     }
@@ -204,7 +211,6 @@ public final class GameManager {
         }
         GameSession cleared = activeSession;
         activeSession = null;
-        teamSelections.clear();
         return Optional.of(cleared);
     }
 

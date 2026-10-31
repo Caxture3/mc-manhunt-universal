@@ -9,6 +9,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LanguageTemplateResolverTest {
+    @org.junit.jupiter.api.Test void registeredExtensionFallbackLetsValidExternalTextWin() {
+        var external=new org.bukkit.configuration.file.YamlConfiguration(); external.set("test:message","External {name}");
+        org.junit.jupiter.api.Assertions.assertEquals("External {name}",LanguageTemplateResolver.extension(external,"test:message","Hello {name}","你好 {name}"));
+        external.set("test:message","Wrong {other}");
+        org.junit.jupiter.api.Assertions.assertEquals("你好 {name}",LanguageTemplateResolver.extension(external,"test:message","Hello {name}","你好 {name}"));
+    }
     private static final List<String> USAGE_KEYS = List.of("command.usage", "game.start.usage",
             "config.usage", "team.usage", "config.structure-unlock-usage");
     private static final String LOCALIZED = "{prefix}用法：/mhu <join|start|status|stop|config>";

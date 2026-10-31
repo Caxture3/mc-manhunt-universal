@@ -12,5 +12,7 @@ public enum ControlDomain {
     /** elimination. */
     ELIMINATION,
     /** victory. */
-    VICTORY
+    VICTORY,
+    /** Explicit ownership of role visibility rules used by presentation extensions. */
+    ROLE_VISIBILITY
 }

@@ -13,6 +13,11 @@ dependencies {
     testImplementation(libs.paper12111)
 }
 tasks.test { useJUnitPlatform() }
+val examples = sourceSets.create("examples") {
+    java.srcDir(rootProject.file("examples/api-1.1/src/main/java"))
+    compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+}
+tasks.named("check") { dependsOn(tasks.named(examples.compileJavaTaskName)) }
 publishing {
     publications { create<MavenPublication>("mavenJava") { from(components["java"]); artifactId = "manhunt-universal-api-paper" } }
 }

@@ -20,6 +20,14 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NetherPortalProtectionListenerTest {
+    @Test void takeoverCanSkipCoreProtectionButNeverUncancelAnExistingDecision() {
+        listener.coreEffect((block, player) -> false);
+        var event = new BlockBreakEvent(scene.block(7, 64, 8), scene.player);
+        listener.onBreak(event); assertFalse(event.isCancelled()); assertEquals(0, denied);
+        event.setCancelled(true); listener.onBreak(event); assertTrue(event.isCancelled());
+        var environment = new BlockBurnEvent(scene.block(7, 64, 8));
+        listener.onBurn(environment); assertFalse(environment.isCancelled());
+    }
     private final PortalProtectionFixture scene = new PortalProtectionFixture();
     private boolean running = true;
     private boolean enabled = true;

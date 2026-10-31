@@ -55,6 +55,8 @@ public final class HunterEndAccessListener implements Listener {
 
     private boolean blocked(Player player) {
         return HunterEndAccessPolicy.blocked(gameManager.activeSession().orElse(null), player.getUniqueId(),
-                configuration.get(BooleanConfigKey.HUNTER_END_RESTRICTION_ENABLED));
+                configuration.get(BooleanConfigKey.HUNTER_END_RESTRICTION_ENABLED))
+                && configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.HUNTER_END_RESTRICTION,
+                player, player.getLocation(), "end-interaction");
     }
 }

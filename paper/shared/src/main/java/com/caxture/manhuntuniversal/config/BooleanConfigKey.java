@@ -13,6 +13,7 @@ public enum BooleanConfigKey {
     ALLOW_BLAZE_SPAWNER_BREAK("allow-blaze-spawner-break", false),
     PREVENT_NETHER_PORTAL_DESTRUCTION("prevent-nether-portal-destruction", false),
     ADJUST_PIGLIN_BARTERING("adjust-piglin-bartering", false),
+    DISABLE_PIGLIN_BRUTES("disable-piglin-brutes", false),
     HUNTER_END_RESTRICTION_ENABLED("hunter-end-restriction-enabled", false);
 
     private final String configKey;

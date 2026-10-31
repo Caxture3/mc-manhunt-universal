@@ -6,6 +6,17 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StructureTargetIndexTest {
+    @Test void scopedInvalidationDropsOnlyMatchingWorldAndTargetObservations() {
+        var index = new StructureTargetIndex(8);
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        index.recordPoint(first, TrackingTargetId.VILLAGE, new PortalPoint(1, 70, 1));
+        index.recordPoint(first, TrackingTargetId.NETHER_FORTRESS, new PortalPoint(2, 70, 2));
+        index.recordPoint(second, TrackingTargetId.VILLAGE, new PortalPoint(3, 70, 3));
+        index.invalidate((id, target) -> id.equals(first) && target == TrackingTargetId.VILLAGE);
+        assertTrue(index.nearest(TrackingTargetId.VILLAGE,
+                new TrackingPosition(first, TrackingWorldKind.OVERWORLD, 0, 70, 0), null, 4096).isEmpty());
+        assertEquals(2, index.size());
+    }
     private final UUID world = UUID.randomUUID();
     private final TrackingPosition viewer = new TrackingPosition(world, TrackingWorldKind.NETHER, 100, 70, 100);
     private final TrackingTargetId fortress = TrackingTargetId.NETHER_FORTRESS;

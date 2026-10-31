@@ -38,4 +38,10 @@ public final class PendingPlayerState {
     public void completeBlindnessRestore(UUID playerId) {
         originalBlindness.remove(playerId);
     }
+
+    public Set<UUID> resetSnapshot() { return Set.copyOf(pendingResets); }
+    public Map<UUID, Optional<BlindnessSnapshot>> blindnessSnapshot() { return Map.copyOf(originalBlindness); }
+    public void restoreSnapshot(Set<UUID> resets, Map<UUID, Optional<BlindnessSnapshot>> blindness) {
+        pendingResets.clear();pendingResets.addAll(resets);originalBlindness.clear();originalBlindness.putAll(blindness);
+    }
 }

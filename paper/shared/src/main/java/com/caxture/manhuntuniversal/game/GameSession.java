@@ -46,6 +46,19 @@ public final class GameSession {
         return id;
     }
 
+    public SessionSnapshot snapshot() {
+        return new SessionSnapshot(id,createdAt,participants,settings,runnerIds,eliminatedParticipants,state,
+                Optional.ofNullable(startedAt),Optional.ofNullable(currentRoundStartedAt),Optional.ofNullable(targetEndWorldId),revision,roundHistory);
+    }
+
+    static GameSession restore(SessionSnapshot saved) {
+        GameSession session=new GameSession(saved.id(),saved.createdAt(),saved.participants(),saved.settings(),saved.runners());
+        session.eliminatedParticipants.addAll(saved.eliminated());session.state=saved.state();
+        session.startedAt=saved.startedAt().orElse(null);session.currentRoundStartedAt=saved.roundStartedAt().orElse(null);
+        session.targetEndWorldId=saved.targetEndWorldId().orElse(null);session.revision=saved.revision();session.roundHistory.addAll(saved.rounds());
+        return session;
+    }
+
     public Instant createdAt() {
         return createdAt;
     }

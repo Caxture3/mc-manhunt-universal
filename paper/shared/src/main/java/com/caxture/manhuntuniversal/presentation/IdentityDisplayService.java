@@ -6,6 +6,7 @@ import com.caxture.manhuntuniversal.game.Role;
 import com.caxture.manhuntuniversal.game.TeamPreference;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.Scoreboard;
@@ -28,6 +29,10 @@ public final class IdentityDisplayService {
     private Team lobbyHunterTeam;
     private boolean hidden;
     private GameSession displayedSession;
+    private Runnable displayChanged = () -> {};
+    private Runnable privacyChanged = () -> {};
+    public void onDisplayChanged(Runnable listener) { displayChanged = listener; }
+    public void onPrivacyChanged(Runnable listener) { privacyChanged = listener; }
 
     public IdentityDisplayService(Server server) {
         this.server = server;
@@ -38,6 +43,7 @@ public final class IdentityDisplayService {
         clearLobbyPreviews();
         displayedSession = session;
         if (!hidden) beginVisible(session);
+        displayChanged.run();
     }
 
     private void beginVisible(GameSession session) {
@@ -73,6 +79,7 @@ public final class IdentityDisplayService {
         clearLobbyPreviews();
         clearFormal(session);
         if (displayedSession != null && displayedSession.id().equals(session.id())) displayedSession = null;
+        displayChanged.run();
     }
 
     private void clearFormal(GameSession session) {
@@ -111,6 +118,18 @@ public final class IdentityDisplayService {
         }
     }
 
+    public Map<UUID,String> snapshotListRestores() {
+        Map<UUID,String> saved=new LinkedHashMap<>();
+        pendingListNameRestores.forEach((id,name)->saved.put(id,name==null?"null":GsonComponentSerializer.gson().serialize(name)));
+        state.originals().forEach((id,original)->saved.put(id,original.listName()==null?"null":GsonComponentSerializer.gson().serialize(original.listName())));
+        return Map.copyOf(saved);
+    }
+    public void restoreListSnapshot(Map<UUID,String> saved) {
+        Map<UUID,Component> decoded=new LinkedHashMap<>();
+        saved.forEach((id,json)->decoded.put(id,json.equals("null")?null:GsonComponentSerializer.gson().deserialize(json)));
+        pendingListNameRestores.clear();pendingListNameRestores.putAll(decoded);
+    }
+
     public void updateLobbyChoice(UUID playerId, TeamPreference preference) {
         if (hidden || preference == TeamPreference.RANDOM) {
             restoreLobbyPreview(playerId);
@@ -133,10 +152,12 @@ public final class IdentityDisplayService {
         boolean runner = preference == TeamPreference.RUNNER;
         (runner ? lobbyRunnerTeam : lobbyHunterTeam).addEntry(player.getName());
         colorListName(player, runner ? Role.RUNNER : Role.HUNTER);
+        displayChanged.run();
     }
 
     public void clearLobbyPreviews() {
         List.copyOf(lobbyOriginals.keySet()).forEach(this::restoreLobbyPreview);
+        displayChanged.run();
     }
 
     public void setHidden(boolean hidden) {
@@ -148,6 +169,7 @@ public final class IdentityDisplayService {
         } else if (displayedSession != null) {
             beginVisible(displayedSession);
         }
+        privacyChanged.run();
     }
 
     private void restoreLobbyPreview(UUID playerId) {
@@ -186,6 +208,7 @@ public final class IdentityDisplayService {
         NamedTextColor color = role == Role.RUNNER ? NamedTextColor.RED : NamedTextColor.AQUA;
         Component current = player.playerListName();
         player.playerListName((current == null ? Component.text(player.getName()) : current).color(color));
+        displayChanged.run();
     }
 
     private void applyEntry(String entry, Role role) {

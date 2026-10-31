@@ -16,5 +16,13 @@ public enum Capability {
     /** victory policy. */
     VICTORY_POLICY,
     /** paper events. */
-    PAPER_EVENTS
+    PAPER_EVENTS,
+    CONFIGURATION_REGISTRY,
+    FEATURE_POLICIES,
+    TEXT_OVERRIDES,
+    PRESENTATION_CONTROL,
+    OBSERVER_IDENTITY,
+    DYNAMIC_TRACKING,
+    ASYNC_TRACKING_LOCATORS,
+    TRACKING_EVENTS
 }

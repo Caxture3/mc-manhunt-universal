@@ -39,10 +39,10 @@ public final class VanillaMatchPresentation implements MatchPresentation {
     @Override
     public void showCountdown(GameSession session, int seconds) {
         forEachOnlineParticipant(session.participants(), player -> {
-            player.showTitle(Title.title(
+            language.title(player, "core:countdown.title", Title.title(
                     language.component(player, "game.start.countdown-title", Map.of("seconds", Integer.toString(seconds))),
                     net.kyori.adventure.text.Component.empty(), SHORT_TITLE));
-            PresentationSoundCue.countdown().play(player);
+            PresentationSoundCue.countdown().play(player, language, "core:countdown.sound");
         });
     }
 
@@ -63,11 +63,11 @@ public final class VanillaMatchPresentation implements MatchPresentation {
         }
         forEachOnlineParticipant(session.participants(), player -> {
             Role role = session.roleOf(player.getUniqueId()).orElseThrow();
-            player.showTitle(Title.title(
+            language.title(player, "core:role.title", Title.title(
                     language.component(player, titleKey, Map.of()),
                     language.component(player, "game.start.role-subtitle", Map.of(
                             "role", language.text(player, roleKey(role)))), SHORT_TITLE));
-            PresentationSoundCue.roleReveal().play(player);
+            PresentationSoundCue.roleReveal().play(player, language, "core:role.sound");
         });
     }
 
@@ -100,13 +100,26 @@ public final class VanillaMatchPresentation implements MatchPresentation {
 
     @Override
     public void showResult(GameResult result) {
+        var match = language.currentMatch();
+        java.util.Map<UUID, com.caxture.manhuntuniversal.api.ParticipantSnapshot> participants = new java.util.LinkedHashMap<>();
+        result.participants().forEach(player -> participants.put(player.id(), new com.caxture.manhuntuniversal.api.ParticipantSnapshot(
+                player.id(), player.name(), result.runners().contains(player.id()) ? com.caxture.manhuntuniversal.api.TeamRole.RUNNER
+                : com.caxture.manhuntuniversal.api.TeamRole.HUNTER, false)));
+        var snapshot = new com.caxture.manhuntuniversal.api.ResultSnapshot(result.sessionId(),
+                com.caxture.manhuntuniversal.api.MatchWinner.valueOf(result.winner().name()),
+                result.customReason().isBlank() ? result.reason().name() : result.customReason(),
+                match.flatMap(com.caxture.manhuntuniversal.api.MatchSnapshot::startedAt), result.settledAt(),
+                match.map(com.caxture.manhuntuniversal.api.MatchSnapshot::participants).orElse(participants), result.killer());
+        language.withResult(snapshot, () -> showResultContent(result));
+    }
+    private void showResultContent(GameResult result) {
         forEachOnlineParticipant(result.participants(), player -> {
             String titleKey = result.winner() == GameWinner.RUNNERS
                     ? "game.result.runners-title" : "game.result.hunters-title";
-            player.showTitle(Title.title(
+            language.title(player, "core:result.title", Title.title(
                     language.component(player, titleKey, Map.of()),
                     net.kyori.adventure.text.Component.empty(), RESULT_TITLE));
-            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.0F);
+            language.sound(player, "core:result.sound", "ui.toast.challenge_complete", 1.0F, 1.0F);
         });
 
         forEachRecipient(recipient -> {

@@ -8,6 +8,22 @@ import java.util.Set;
  * Mutation failures are returned as statuses; reentrant mutation requests return BUSY.
  */
 public interface ManhuntUniversalApi {
+    /** Optional API 1.1 capability; check capabilities before calling. */
+    default com.caxture.manhuntuniversal.api.config.ConfigurationRegistry configuration() {
+        throw new UnsupportedOperationException("Configuration registry unavailable");
+    }
+    /** Optional API 1.1 capability; check capabilities before calling. */
+    default com.caxture.manhuntuniversal.api.feature.FeatureRegistry features() {
+        throw new UnsupportedOperationException("Feature registry unavailable");
+    }
+    /** Optional API 1.1 capability; check capabilities before calling. */
+    default com.caxture.manhuntuniversal.api.text.TextRegistry texts() {
+        throw new UnsupportedOperationException("Text registry unavailable");
+    }
+    /** Optional API 1.1 capability; check capabilities before calling. */
+    default com.caxture.manhuntuniversal.api.tracking.TrackingRegistry tracking() {
+        throw new UnsupportedOperationException("Tracking registry unavailable");
+    }
     /**
      * Independent semantic version of this extension API.
      * @return the requested value or operation outcome

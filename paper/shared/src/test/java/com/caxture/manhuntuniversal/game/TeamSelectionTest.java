@@ -124,11 +124,11 @@ class TeamSelectionTest {
         assertEquals(List.of(a, b), session.runnerIds());
         manager.cancel(session.id(), TerminationReason.ADMIN_STOPPED, now).orElseThrow();
         manager.clearSettled(session.id()).orElseThrow();
-        assertTrue(teams.snapshot().isEmpty());
+        assertEquals(TeamPreference.RUNNER, teams.preferenceOf(b));
     }
 
     @Test
-    void tooFewPlayersKeepsChoicesAndNormalSettlementClearsThem() {
+    void tooFewPlayersAndNormalSettlementKeepTheExplicitChoices() {
         teams.choose(a, TeamPreference.RUNNER, 1);
         var settings = new MatchSettings(1, false, new TrackingSettingsSnapshot(512, 30, 4096));
         assertEquals(StartStatus.NOT_ENOUGH_PLAYERS, manager.start(List.of(new Participant(a, "A")), settings, now).status());
@@ -137,7 +137,7 @@ class TeamSelectionTest {
         manager.activate(session.id(), now);
         manager.recordRunnerDeath(session.id(), a, java.util.Optional.empty(), now.plusSeconds(10)).orElseThrow();
         manager.clearSettled(session.id()).orElseThrow();
-        assertTrue(teams.snapshot().isEmpty());
+        assertEquals(TeamPreference.RUNNER, teams.preferenceOf(a));
     }
 
     private StartResult start(int runnerCount) {

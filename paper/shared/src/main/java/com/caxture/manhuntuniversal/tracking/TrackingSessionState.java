@@ -43,11 +43,17 @@ public final class TrackingSessionState {
     }
 
     public void recordPosition(UUID playerId, TrackingPosition position) {
-        positions.computeIfAbsent(playerId, ignored -> new LinkedHashMap<>())
-                .put(position.worldId(), position);
+        Map<UUID,TrackingPosition> byWorld=positions.computeIfAbsent(playerId, ignored -> new LinkedHashMap<>());
+        byWorld.remove(position.worldId());byWorld.put(position.worldId(), position);
         latestPositions.put(playerId, position);
         recentWorlds.computeIfAbsent(playerId, ignored -> new HashMap<>())
                 .put(position.worldKind(), position.worldId());
+    }
+    public Map<UUID,java.util.List<TrackingPosition>> positionSnapshot() {
+        Map<UUID,java.util.List<TrackingPosition>> saved=new HashMap<>();positions.forEach((id,byWorld)->saved.put(id,java.util.List.copyOf(byWorld.values())));return Map.copyOf(saved);
+    }
+    public void restorePositions(Map<UUID,java.util.List<TrackingPosition>> saved) {
+        saved.forEach((id,values)->values.forEach(position->recordPosition(id,position)));
     }
 
     public Optional<TrackingPosition> latestPosition(UUID playerId) {

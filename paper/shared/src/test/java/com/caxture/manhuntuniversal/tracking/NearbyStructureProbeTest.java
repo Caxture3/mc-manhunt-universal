@@ -42,6 +42,16 @@ class NearbyStructureProbeTest {
     private final NearbyStructureProbe probe = new NearbyStructureProbe(source, index, () -> now, exception -> fail(exception));
     private final NearbyStructureProbe.Query query = new NearbyStructureProbe.Query(world, current, TrackingTargetId.NETHER_FORTRESS);
 
+    @Test void invalidationAllowsImmediateMetadataRecheckWithoutWaitingForTtl() {
+        probe.request(query); probe.tick();
+        assertEquals(1, referenceReads);
+        probe.request(query); probe.tick();
+        assertEquals(1, referenceReads);
+        probe.invalidate((id, target) -> id.equals(world) && target == query.target());
+        probe.request(query); probe.tick();
+        assertEquals(2, referenceReads);
+    }
+
     @Test void twoStartLoadsAreGloballyBoundedAndGeometryWaitsForAllOfThem() {
         references.addAll(List.of(new PortalSearchCursor.Chunk(-10, 0), new PortalSearchCursor.Chunk(20, 0),
                 new PortalSearchCursor.Chunk(30, 0)));

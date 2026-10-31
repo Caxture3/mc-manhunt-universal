@@ -56,6 +56,11 @@ public final class ActiveGameCoordinator {
     private UUID countdownSessionId;
     private int countdownRemaining;
     private GameExtensionHooks extensionHooks = GameExtensionHooks.NONE;
+    private Runnable runningEnvironmentChanged = () -> {}, lobbyReturned = () -> {};
+    private Runnable checkpointNeeded = () -> {};
+    public void onCheckpointNeeded(Runnable listener) { checkpointNeeded = listener; }
+    public void onRunningEnvironmentChanged(Runnable listener) { runningEnvironmentChanged = listener; }
+    public void onLobbyReturned(Runnable listener) { lobbyReturned = listener; }
 
     public void setExtensionHooks(GameExtensionHooks hooks) {
         extensionHooks = java.util.Objects.requireNonNull(hooks);
@@ -133,7 +138,7 @@ public final class ActiveGameCoordinator {
     }
 
     private boolean activateInternal(GameSession session) {
-        TrackingSettings trackingSettings = configuration.values().trackingSettings();
+        TrackingSettings trackingSettings = configuration.matchValues().trackingSettings();
         GameSession activated = gameManager.activate(
                 session.id(), Instant.now(clock),
                 new TrackingSettingsSnapshot(
@@ -147,6 +152,7 @@ public final class ActiveGameCoordinator {
         tracking.start(activated);
         presentation.showStart(activated);
         extensionHooks.started(activated);
+        runningEnvironmentChanged.run();
         // With player reset disabled, a runner may already be in the End at activation.
         activated.livingRunnerIds().forEach(playerId -> {
             Player player = server.getPlayer(playerId);
@@ -185,6 +191,26 @@ public final class ActiveGameCoordinator {
         tracking.shutdown();
         spectators.restoreAllOnline();
         gameManager.teamSelections().clear();
+    }
+    public java.util.Map<UUID,RunnerSpectatorService.OriginalMode> spectatorSnapshot() { return spectators.snapshot(); }
+    public void restoreSpectators(java.util.Map<UUID,RunnerSpectatorService.OriginalMode> saved) { spectators.restoreSnapshot(saved); }
+    public void suspendForRestart() {
+        for(Runnable action:java.util.List.<Runnable>of(this::cancelAllTasks,blindness::restoreAllOnline,tracking::shutdown,
+                ()->gameManager.activeSession().ifPresent(identity::clear),spectators::restoreAllOnline,()->gameManager.teamSelections().clear())) {
+            try {action.run();}catch(RuntimeException|LinkageError error){plugin.getLogger().log(java.util.logging.Level.SEVERE,"Restart suspension cleanup failed",error);}
+        }
+    }
+    public void resumeRunning(GameSession session,java.util.Map<UUID,java.util.List<com.caxture.manhuntuniversal.tracking.TrackingPosition>> positions,java.util.Map<UUID,String> selections) {
+        extensionHooks.inMutation(()->{resumeRunningInternal(session,positions,selections);return null;});
+    }
+    private void resumeRunningInternal(GameSession session,java.util.Map<UUID,java.util.List<com.caxture.manhuntuniversal.tracking.TrackingPosition>> positions,java.util.Map<UUID,String> selections) {
+        requireRunningSession(session);
+        server.getOnlinePlayers().forEach(identity::restorePending);
+        identity.begin(session);
+        tracking.resume(session,positions,selections);
+        server.getOnlinePlayers().forEach(this::playerJoined);
+        session.targetEndWorldId().ifPresent(world->startDragonPresenceProbe(session.id(),world));
+        runningEnvironmentChanged.run();
     }
 
     public void abortStart(UUID expectedSessionId) {
@@ -379,6 +405,7 @@ public final class ActiveGameCoordinator {
     }
 
     public void configurationChanged(BooleanConfigKey key) {
+        if (key == BooleanConfigKey.DISABLE_PIGLIN_BRUTES) runningEnvironmentChanged.run();
         if (key == BooleanConfigKey.FORCE_RANDOM_ROLES) {
             gameManager.teamSelections().setForcedRandom(configuration.get(key));
         } else if (key == BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS) {
@@ -404,6 +431,7 @@ public final class ActiveGameCoordinator {
                     return;
                 }
                 World world = server.getWorld(worldId);
+                if (world == null) return;
                 boolean livingDragon = world != null && world.getEntitiesByClass(EnderDragon.class).stream()
                         .anyMatch(dragon -> dragon.isValid() && !dragon.isDead());
                 DragonBattle battle = world == null ? null : world.getEnderDragonBattle();
@@ -510,6 +538,7 @@ public final class ActiveGameCoordinator {
             }
         }
         gameManager.clearSettled(session.id());
+        try {lobbyReturned.run();}finally{checkpointNeeded.run();}
     }
 
     private Optional<GameSession> currentSession(UUID expectedSessionId) {

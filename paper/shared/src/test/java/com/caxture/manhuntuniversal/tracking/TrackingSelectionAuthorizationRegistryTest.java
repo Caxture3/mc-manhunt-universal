@@ -5,6 +5,12 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TrackingSelectionAuthorizationRegistryTest {
+    @Test void restoredSessionUsesANewAuthorizationEpoch() {
+        UUID player=UUID.randomUUID(),session=UUID.randomUUID();
+        var before=new TrackingSelectionAuthorizationRegistry(100);var after=new TrackingSelectionAuthorizationRegistry(200);
+        long old=before.issue(player,session).authorizationId();long current=after.issue(player,session).authorizationId();
+        assertNotEquals(old,current);assertFalse(after.consume(player,session,old));assertTrue(after.consume(player,session,current));
+    }
     @Test void staleCloseOrChoiceCannotConsumeAReplacementMenuAndInspectionDoesNotConsume() {
         var registry = new TrackingSelectionAuthorizationRegistry();
         UUID player = UUID.randomUUID(), session = UUID.randomUUID();

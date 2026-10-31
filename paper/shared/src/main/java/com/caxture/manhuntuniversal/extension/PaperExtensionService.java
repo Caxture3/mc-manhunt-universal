@@ -29,6 +29,15 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
     private final ExtensionRuntime runtime;
     private final Clock clock;
     private final ExtensionRegistry registry;
+    private final OwnedRegistry children;
+    private com.caxture.manhuntuniversal.extension.config.ConfigurationRegistryService configurationRegistry;
+    private final com.caxture.manhuntuniversal.extension.feature.FeatureRegistryService featureRegistry;
+    private final com.caxture.manhuntuniversal.extension.text.TextRegistryService textRegistry;
+    private final com.caxture.manhuntuniversal.extension.presentation.PresentationRegistryService presentationRegistry;
+    private java.util.function.BooleanSupplier hideRoles = () -> false;
+    private com.caxture.manhuntuniversal.presentation.ObserverIdentityPresentation observerIdentity;
+    private com.caxture.manhuntuniversal.extension.tracking.TrackingRegistryService trackingRegistry;
+    private org.bukkit.scheduler.BukkitTask refreshTask;
     private boolean available = true;
     private int mutationDepth;
     private boolean explicitFinish;
@@ -117,14 +126,66 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         this.runtime = Objects.requireNonNull(runtime);
         this.clock = Objects.requireNonNull(clock);
         this.registry = new ExtensionRegistry(this::requireThread);
+        this.children = new OwnedRegistry(this::requireThread, this::writeGate, registry::owns,
+                exception -> logger.log(Level.WARNING, "Extension callback failed", exception));
+        registry.onClosing(children::closeOwner);
+        featureRegistry = new com.caxture.manhuntuniversal.extension.feature.FeatureRegistryService(children);
+        textRegistry = new com.caxture.manhuntuniversal.extension.text.TextRegistryService(children);
+        presentationRegistry = new com.caxture.manhuntuniversal.extension.presentation.PresentationRegistryService(children, () -> hideRoles.getAsBoolean());
     }
 
-    @Override public String apiVersion() { return "1.0.0"; }
-    @Override public Set<Capability> capabilities() { return Set.of(Capability.values()); }
+    @Override public String apiVersion() { return "1.1.0"; }
+    @Override public Set<Capability> capabilities() {
+        var supported=EnumSet.of(Capability.MATCH_QUERY,Capability.MATCH_CONTROL,Capability.ROLE_CONTROL,Capability.PARTICIPANT_CONTROL,
+                Capability.ELIMINATION_POLICY,Capability.VICTORY_POLICY,Capability.PAPER_EVENTS);
+        if(configurationRegistry!=null)supported.addAll(Set.of(Capability.CONFIGURATION_REGISTRY,Capability.FEATURE_POLICIES,Capability.TEXT_OVERRIDES,Capability.PRESENTATION_CONTROL));
+        if(observerIdentity!=null)supported.add(Capability.OBSERVER_IDENTITY);
+        if(trackingRegistry!=null)supported.addAll(Set.of(Capability.DYNAMIC_TRACKING,Capability.ASYNC_TRACKING_LOCATORS,Capability.TRACKING_EVENTS));
+        return Set.copyOf(supported);
+    }
     @Override public MatchQuery matches() { return query; }
     @Override public MatchController control() { return matchController; }
     @Override public RoleController roles() { return roleController; }
     @Override public ParticipantController participants() { return participantController; }
+    @Override public com.caxture.manhuntuniversal.api.feature.FeatureRegistry features() { requireThread(); return featureRegistry; }
+    @Override public com.caxture.manhuntuniversal.api.paper.text.PaperTextRegistry texts() { requireThread(); return textRegistry; }
+    @Override public com.caxture.manhuntuniversal.api.paper.presentation.PresentationRegistry presentation() { requireThread(); return presentationRegistry; }
+    @Override public com.caxture.manhuntuniversal.api.tracking.TrackingRegistry tracking() {
+        requireThread(); if (trackingRegistry == null) return PaperManhuntUniversalApi.super.tracking(); return trackingRegistry;
+    }
+    public void installTracking(JavaPlugin plugin, com.caxture.manhuntuniversal.tracking.CompassTrackingService tracking,
+                                com.caxture.manhuntuniversal.client.PaperTrackingClientPublisher clients) {
+        requireThread(); trackingRegistry = tracking.enableExtensions(children, this::current, clients);
+        clients.setDynamicSelectionHandler(tracking::applyDynamicSelection);
+        refreshTask = server.getScheduler().runTaskTimer(plugin, () -> presentationRegistry.flushRefresh(request -> {
+            if (observerIdentity != null && request.scopes().contains(com.caxture.manhuntuniversal.api.paper.presentation.RefreshScope.IDENTITY)) observerIdentity.refreshSoon();
+            tracking.refreshPresentation(request);
+        }), 1L, 1L);
+    }
+    public com.caxture.manhuntuniversal.extension.presentation.PresentationRegistryService presentationService() { return presentationRegistry; }
+    public void installIdentity(JavaPlugin plugin, com.caxture.manhuntuniversal.presentation.IdentityDisplayService identity) {
+        requireThread();
+        observerIdentity = new com.caxture.manhuntuniversal.presentation.ObserverIdentityPresentation(plugin, presentationRegistry, this::current, () -> hideRoles.getAsBoolean());
+        identity.onDisplayChanged(observerIdentity::refreshSoon);
+        identity.onPrivacyChanged(observerIdentity::privacyChanged);
+    }
+    @Override public com.caxture.manhuntuniversal.api.config.ConfigurationRegistry configuration() {
+        requireThread();
+        if (configurationRegistry == null) return PaperManhuntUniversalApi.super.configuration();
+        return configurationRegistry;
+    }
+    public com.caxture.manhuntuniversal.extension.config.ConfigurationRegistryService installConfiguration(
+            com.caxture.manhuntuniversal.config.ConfigurationService configuration,
+            com.caxture.manhuntuniversal.i18n.LanguageService language) {
+        requireThread();
+        configurationRegistry = new com.caxture.manhuntuniversal.extension.config.ConfigurationRegistryService(children, ignored -> {});
+        new com.caxture.manhuntuniversal.extension.config.CoreConfigurationBindings(configuration, configurationRegistry,
+                key -> language.localized("config.name." + key));
+        configuration.featureAccess(new com.caxture.manhuntuniversal.extension.feature.CoreFeatureAccess(featureRegistry, this::current));
+        hideRoles = () -> configuration.get(com.caxture.manhuntuniversal.config.BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS);
+        language.extensions(textRegistry, new com.caxture.manhuntuniversal.extension.presentation.PresentationDispatcher(presentationRegistry, this::current));
+        return configurationRegistry;
+    }
 
     private Optional<MatchSnapshot> current() {
         requireThread();
@@ -144,6 +205,8 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         requireThread();
         available = false;
         registry.clear();
+        if (observerIdentity != null) observerIdentity.close();
+        if (refreshTask != null) refreshTask.cancel();
     }
 
     @Override public <T> T inMutation(Supplier<T> action) {
@@ -153,12 +216,12 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         finally { mutationDepth--; }
     }
 
-    @Override public boolean mutationActive() { return mutationDepth > 0; }
+    @Override public boolean mutationActive() { return mutationDepth > 0 || children.busy(); }
 
     private OperationStatus writeGate() {
         if (!server.isPrimaryThread()) return OperationStatus.WRONG_THREAD;
         if (!available) return OperationStatus.SERVICE_UNAVAILABLE;
-        if (mutationDepth > 0) return OperationStatus.BUSY;
+        if (mutationDepth > 0 || children != null && children.busy()) return OperationStatus.BUSY;
         return null;
     }
 
@@ -315,6 +378,7 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
     }
 
     @Override public boolean preparing(GameSession session, int seconds) {
+        if(configurationRegistry!=null)configurationRegistry.beginMatch(session.id());
         return inMutation(() -> {
             MatchPreparingEvent event = new MatchPreparingEvent(MatchSnapshots.of(session), seconds);
             fire(event);
@@ -329,6 +393,7 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
     }
     @Override public void ended(GameSession session, TerminationReason reason, GameResult result) {
         inMutation(() -> {
+            if(configurationRegistry!=null)configurationRegistry.endMatch(session.id());
             fire(new MatchEndedEvent(MatchSnapshots.of(session), reason.name(), Optional.ofNullable(result).map(this::victory)));
             return null;
         });

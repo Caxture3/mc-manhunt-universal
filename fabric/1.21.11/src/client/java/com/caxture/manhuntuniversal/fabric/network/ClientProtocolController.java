@@ -100,6 +100,18 @@ public final class ClientProtocolController {
                     "Received an unexpected CLIENT_HELLO from the server");
             case TrackingSelectionChoose ignored -> logger.warn(
                     "Received an unexpected TRACKING_SELECTION_CHOOSE from the server");
+            case com.caxture.manhuntuniversal.protocol.DynamicTrackingOpen open -> {
+                if (compatible && open.protocolVersion() == ProtocolConstants.VERSION) {
+                    closeAnySelector();
+                    if (!open.targets().isEmpty()) minecraft.setScreenAndShow(new com.caxture.manhuntuniversal.fabric.ui.DynamicTrackingSelectionScreen(open,
+                            (id, revision) -> sendDynamicChoice(open, id, revision), () -> sendDynamicCancellation(open)));
+                }
+            }
+            case com.caxture.manhuntuniversal.protocol.DynamicTrackingUpdate update -> {
+                if (compatible && minecraft.screen instanceof com.caxture.manhuntuniversal.fabric.ui.DynamicTrackingSelectionScreen selector
+                        && selector.matches(update.sessionId(), update.authorizationId())) selector.update(update);
+            }
+            case com.caxture.manhuntuniversal.protocol.DynamicTrackingChoose ignored -> logger.warn("Unexpected dynamic choice from server");
         }
     }
 
@@ -151,7 +163,18 @@ public final class ClientProtocolController {
                         selected))));
     }
 
+    private void sendDynamicChoice(com.caxture.manhuntuniversal.protocol.DynamicTrackingOpen open, String id, long revision) {
+        if (compatible && ClientPlayNetworking.canSend(MainChannelPayload.TYPE)) ClientPlayNetworking.send(new MainChannelPayload(ProtocolCodec.encode(
+                new com.caxture.manhuntuniversal.protocol.DynamicTrackingChoose(ProtocolConstants.VERSION, open.sessionId(), open.authorizationId(), revision, id))));
+    }
+    private void sendDynamicCancellation(com.caxture.manhuntuniversal.protocol.DynamicTrackingOpen open) {
+        if (compatible && ClientPlayNetworking.canSend(MainChannelPayload.TYPE)) ClientPlayNetworking.send(new MainChannelPayload(ProtocolCodec.encode(
+                new TrackingSelectionClose(ProtocolConstants.VERSION, open.sessionId(), open.authorizationId()))));
+    }
     private void closeSelector(UUID sessionId, long authorizationId) {
+        if (minecraft.screen instanceof com.caxture.manhuntuniversal.fabric.ui.DynamicTrackingSelectionScreen dynamic
+                && dynamic.matches(sessionId, authorizationId)) { dynamic.closeFromServer(); return; }
+
         if (minecraft.screen instanceof CompassTrackingSelectionScreen selector
                 && selector.matches(sessionId, authorizationId)) {
             selector.closeFromServer();
@@ -159,6 +182,10 @@ public final class ClientProtocolController {
     }
 
     private void closeAnySelector() {
+        if (minecraft.screen instanceof com.caxture.manhuntuniversal.fabric.ui.DynamicTrackingSelectionScreen dynamic) {
+            dynamic.closeFromServer(); return;
+        }
+
         if (minecraft.screen instanceof CompassTrackingSelectionScreen selector) {
             minecraft.execute(() -> {
                 if (minecraft.screen == selector) {

@@ -111,7 +111,7 @@ public final class PaperDialogTrackingSelectionPresenter implements TrackingSele
                         .build())
                 .type(DialogType.multiAction(buttons, exit, buttons.size())));
         // Replacing the displayed dialog does not invoke its exit action.
-        player.showDialog(dialog);
+        languages.showDialog(player, "core:tracking.menu", dialog);
     }
 
     private DialogActions actions(Player player, ActiveDialog active, long revision) {

@@ -32,6 +32,24 @@ public final class PaperTrackingClientPublisher
             (ignoredPlayer, ignoredChoice) -> { };
     private BiConsumer<Player, TrackingSelectionClose> closeHandler =
             (ignoredPlayer, ignoredClose) -> { };
+    private BiConsumer<Player, com.caxture.manhuntuniversal.protocol.DynamicTrackingChoose> dynamicHandler = (player, message) -> {};
+    public void setDynamicSelectionHandler(BiConsumer<Player, com.caxture.manhuntuniversal.protocol.DynamicTrackingChoose> handler) {
+        dynamicHandler = Objects.requireNonNull(handler);
+    }
+    @Override public boolean openDynamic(Player player, com.caxture.manhuntuniversal.protocol.DynamicTrackingOpen message) {
+        return sendDynamic(player, message);
+    }
+    @Override public boolean updateDynamic(Player player, com.caxture.manhuntuniversal.protocol.DynamicTrackingUpdate message) {
+        return sendDynamic(player, message);
+    }
+    private boolean sendDynamic(Player player, ProtocolMessage message) {
+        if (!capabilities.supports(player.getUniqueId()) || message.protocolVersion() != ProtocolConstants.VERSION) return false;
+        try { send(player, message); return true; }
+        catch (IllegalArgumentException exception) {
+            plugin.getLogger().warning("Dynamic tracking menu could not be sent; using Paper Dialog: " + exception.getMessage());
+            return false;
+        }
+    }
 
     public PaperTrackingClientPublisher(JavaPlugin plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -105,6 +123,9 @@ public final class PaperTrackingClientPublisher
             if (decoded instanceof ClientHello hello) {
                 boolean compatible = capabilities.accept(player.getUniqueId(), hello);
                 send(player, new ServerHello(ProtocolConstants.VERSION, compatible));
+            } else if (decoded instanceof com.caxture.manhuntuniversal.protocol.DynamicTrackingChoose choice
+                    && capabilities.supports(player.getUniqueId()) && choice.protocolVersion() == ProtocolConstants.VERSION) {
+                dynamicHandler.accept(player, choice);
             } else if (decoded instanceof TrackingSelectionChoose choice
                     && capabilities.supports(player.getUniqueId())
                     && choice.protocolVersion() == ProtocolConstants.VERSION) {

@@ -13,7 +13,7 @@
 - `/mhu join hunter|runner|random`：所有玩家均可选队，random 清除明确选择；不带队伍时显示可点击提示。
 - `/mhu start [秒数]`、`status`、`stop`、`config [key] [value]`：需要 `randomanhunt.admin`，默认 OP。`status` 显示本局参与者、时间和固定身份名单。
 
-速通者预约满额时拒绝新选择并保留原队伍；重复选择不改变顺序。空闲时降低 `runner-count` 并成功保存后，从最后加入者开始将超额选择恢复为随机。倒计时或运行中修改只影响下一局，不清除预约或触发容量提示。离线、结算、停止或倒计时取消会清空选队；开始倒计时后不允许改队，也不会因配置变化或离线而重分配本局角色。
+速通者预约满额时拒绝新选择并保留原队伍；重复选择不改变顺序。空闲时降低 `runner-count` 并成功保存后，从最后加入者开始将超额选择恢复为随机。倒计时或运行中修改只影响下一局，不清除预约或触发容量提示。退出会清空该玩家的选队；结算、停止或倒计时取消后保留在线玩家的明确选择与顺序，并恢复预览颜色。开始倒计时后不允许改队，也不会因配置变化或离线而重分配本局角色。
 
 未开局时登录会收到选队提示。指定猎人不参与速通者随机抽取；开局仍至少需要一名猎人。选择 hunter 后名称牌和 Tab 为青色，runner 为红色；切回 random 时恢复原显示。`status` 同时显示存活速通者人数。
 
@@ -58,6 +58,8 @@
 
 时运、烈焰棒和交易优化对正式游戏期间的所有玩家生效，空闲和倒计时不生效。详见[优化配置与概率说明](docs/optional-optimizations.md)。
 
+`disable-piglin-brutes=false` 可在正式游戏中禁止猪灵蛮兵生成并移除现存蛮兵，普通猪灵不受影响。正常关服/重启会通过 `runtime-state.yml` 保存和恢复当前游戏；停服期间暂停计时，RUNNING 恢复不再重置玩家。选队只在同次运行中跨对局保留，退出仍清除。详见[续局与蛮兵配置说明](docs/runtime-continuity.md)。
+
 ## 版本矩阵
 
 | Minecraft | Paper API | Fabric API | 编译 / 运行 Java | 客户端构建 |
@@ -95,7 +97,7 @@ Linux / macOS 使用 `bash ./gradlew` 替代 `.\gradlew.bat`。如果 JDK 未被
 
 ```text
 common/                 纯 Java 公共逻辑预留区（Java 21）
-protocol/               原项目协议及编解码（Java 21，保持原样）
+protocol/               有界的客户端协议与编解码（Java 21）
 api/                    公共扩展接口与不可变数据（Java 21）
 api-paper/              Paper 服务入口和事件 SDK（Java 21）
 paper/
@@ -131,14 +133,18 @@ Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版
 
 聊天前缀按客户端语言显示为 `穹猎追杀` / `Manhunt Universal`。升级不会自动改写 `plugins/ManhuntUniversal/lang/` 下的旧语言文件；已有服务器请按 [语言更新说明](docs/lobby-config.md) 手动更新相关条目。
 
+SDK 独立版本为 **1.1.0**，六个 SDK JAR 位于 `dist/sdk/`；四个可部署插件/模组及 SHA-256 清单位于 `dist/`。扩展可通过服务端 API 注册新追踪目标，无需附加 Fabric 模组；自定义材质可选用资源包，缺失时自动回退。两端选择协议为 **3**，旧模组或未安装模组的客户端使用 Paper Dialog。接入与验证边界见[API 1.1 指南](docs/extension-api-1.1.md)。
+
 ## 相关说明
 
 - [选队、配置交互和外部语言文件维护](docs/lobby-config.md)
 - [速通者淘汰、身份颜色和刷怪笼保护](docs/elimination-and-colors.md)
 - [下界传送门保护](docs/nether-portal-protection.md)
+- [蛮兵开关、跨局选队与重启续局](docs/runtime-continuity.md)
 - [矿物时运、猪灵交易和末地限制](docs/optional-optimizations.md)
 - [强制随机和隐藏角色分配](docs/role-options.md)
-- [扩展插件 API、SDK 与轮换插件示例](docs/extension-api.md)
+- [扩展 API 1.1：配置、显示与动态追踪目标](docs/extension-api-1.1.md)
+- [对局/角色 API 与轮换插件示例](docs/extension-api.md)
 - [结构追踪解锁时间与客户端兼容](docs/structure-tracker-unlock.md)
 - [结构与传送门追踪的查询方式和性能边界](docs/tracking-performance.md)
 

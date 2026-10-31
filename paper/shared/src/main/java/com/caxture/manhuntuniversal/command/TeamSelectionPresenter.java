@@ -17,7 +17,7 @@ public final class TeamSelectionPresenter {
 
     public void show(Player player) {
         if (!selectionEnabled.getAsBoolean()) return;
-        player.sendMessage(InteractiveMessages.teamPrompt(
+        language.sendComponent(player, "core:team.prompt", InteractiveMessages.teamPrompt(
                 language.chatComponent(player, "team.prompt", Map.of()),
                 language.component(player, "team.button.hunter", Map.of()),
                 language.component(player, "team.button.runner", Map.of()),

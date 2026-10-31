@@ -46,6 +46,10 @@ game:
       §b猎人§6：§f{hunters}
     killer-section: "§6 击杀者：§f{player}"
 config:
+  next-value: " §7（下局值：{value}）"
+  locked-detail: "§c[由 {owner} 接管：{reason}]"
+  value-overridden: " §7（保存值：{value}）"
+  next-match: "下一局生效；不改变已锁定身份和本局搜索参数。"
   map-start: "§7- §e{key}§7 = {"
   structure-unlock-usage: "{prefix}§e用法：/mhu config runner-structure-tracker-unlock-time.<结构名称> <秒数 | 填写 -1 代表禁用>"
   header: "{prefix}§f配置项："
@@ -70,6 +74,7 @@ config:
     hide-role-assignments: "隐藏角色分配"
     ore-fortune-level: "矿物爆率提高等级 (0~5)"
     adjust-piglin-bartering: "猪灵交易爆率提高"
+    disable-piglin-brutes: "禁用猪灵蛮兵"
     blaze-rod-looting-level: "烈焰棒爆率提高等级 (0~5)"
     hunter-end-restriction-enabled: "速通者进入末地前 禁止猎人与末地传送门交互"
     runner-count: "速通者人数"

@@ -23,6 +23,14 @@ public final class ConfigurationService {
     private IntConsumer runnerCountChanged = ignored -> {};
     private Consumer<BooleanConfigKey> booleanChanged = ignored -> {};
     private Runnable structureUnlockTimesChanged = () -> {};
+    private java.util.function.Function<String, Object> effectiveValue;
+    private java.util.function.Function<String,Object> activeValue;
+    private java.util.function.BiFunction<String, Object, Boolean> registryWrite;
+    private com.caxture.manhuntuniversal.extension.feature.CoreFeatureAccess features;
+    public void featureAccess(com.caxture.manhuntuniversal.extension.feature.CoreFeatureAccess features) { this.features = features; }
+    public boolean coreEffect(String feature, org.bukkit.entity.Entity actor, org.bukkit.Location position, String operation) {
+        return features == null || features.allows(feature, actor, position, operation);
+    }
 
     public ConfigurationService(JavaPlugin plugin) {
         this(plugin, new AtomicFileWriter());
@@ -50,19 +58,42 @@ public final class ConfigurationService {
     }
 
     public synchronized ConfigurationValues values() {
-        return values;
+        if (effectiveValue == null) return values;
+        ConfigurationValues snapshot = values;
+        for (var key : IntConfigKey.values()) snapshot = snapshot.with(key, get(key));
+        for (var key : BooleanConfigKey.values()) snapshot = snapshot.with(key, get(key));
+        for (var key : DecimalConfigKey.values()) snapshot = snapshot.with(key, get(key));
+        return snapshot;
+    }
+
+    public synchronized ConfigurationValues savedValues() { return values; }
+    public synchronized void bindRegistry(java.util.function.Function<String, Object> reader,
+                                         java.util.function.BiFunction<String, Object, Boolean> writer) {
+        bindRegistry(reader,reader,writer);
+    }
+    public synchronized void bindRegistry(java.util.function.Function<String,Object> reader,java.util.function.Function<String,Object> active,
+                                         java.util.function.BiFunction<String,Object,Boolean> writer){
+        effectiveValue=reader;activeValue=active;registryWrite=writer;
+    }
+    public synchronized ConfigurationValues matchValues(){
+        if(activeValue==null)return values();
+        ConfigurationValues snapshot=values;
+        for(var key:IntConfigKey.values())snapshot=snapshot.with(key,((Number)activeValue.apply(key.configKey())).intValue());
+        for(var key:BooleanConfigKey.values())snapshot=snapshot.with(key,(Boolean)activeValue.apply(key.configKey()));
+        for(var key:DecimalConfigKey.values())snapshot=snapshot.with(key,((Number)activeValue.apply(key.configKey())).doubleValue());
+        return snapshot;
     }
 
     public synchronized int get(IntConfigKey key) {
-        return values.get(key);
+        return effectiveValue == null ? values.get(key) : ((Number) effectiveValue.apply(key.configKey())).intValue();
     }
 
     public synchronized boolean get(BooleanConfigKey key) {
-        return values.get(key);
+        return effectiveValue == null ? values.get(key) : (Boolean) effectiveValue.apply(key.configKey());
     }
 
     public synchronized double get(DecimalConfigKey key) {
-        return values.get(key);
+        return effectiveValue == null ? values.get(key) : ((Number) effectiveValue.apply(key.configKey())).doubleValue();
     }
 
     public synchronized boolean showChatPrefix() {
@@ -74,6 +105,7 @@ public final class ConfigurationService {
     }
 
     public synchronized boolean update(IntConfigKey key, int value) {
+        if (registryWrite != null) return registryWrite.apply(key.configKey(), value);
         ConfigurationValues updated = values.with(key, value);
         Object previousRaw = yaml.get(key.configKey());
         yaml.set(key.configKey(), value);
@@ -92,6 +124,7 @@ public final class ConfigurationService {
     }
 
     public synchronized boolean update(BooleanConfigKey key, boolean value) {
+        if (registryWrite != null) return registryWrite.apply(key.configKey(), value);
         ConfigurationValues updated = values.with(key, value);
         Object previousRaw = yaml.get(key.configKey());
         yaml.set(key.configKey(), value);
@@ -109,6 +142,7 @@ public final class ConfigurationService {
     }
 
     public synchronized boolean update(DecimalConfigKey key, double value) {
+        if (registryWrite != null) return registryWrite.apply(key.configKey(), value);
         ConfigurationValues updated = values.with(key, value);
         Object previousRaw = yaml.get(key.configKey());
         yaml.set(key.configKey(), value);
@@ -122,6 +156,31 @@ public final class ConfigurationService {
 
     public synchronized void onStructureUnlockTimesChanged(Runnable listener) {
         structureUnlockTimesChanged = Objects.requireNonNull(listener);
+    }
+
+    /** Internal atomic persistence gateway. Registry publishes effective changes after this succeeds. */
+    public synchronized boolean commitRaw(Map<String, Object> changes) {
+        ConfigurationValues candidate = values;
+        for (var entry : changes.entrySet()) {
+            var integer = IntConfigKey.find(entry.getKey()).orElse(null);
+            var bool = BooleanConfigKey.find(entry.getKey()).orElse(null);
+            var decimal = DecimalConfigKey.find(entry.getKey()).orElse(null);
+            if (integer != null) candidate = candidate.with(integer, ((Number) entry.getValue()).intValue());
+            else if (bool != null) candidate = candidate.with(bool, (Boolean) entry.getValue());
+            else if (decimal != null) candidate = candidate.with(decimal, ((Number) entry.getValue()).doubleValue());
+            else throw new IllegalArgumentException("Unknown core key: " + entry.getKey());
+        }
+        Map<String, Object> old = new HashMap<>();
+        changes.forEach((key, value) -> { old.put(key, yaml.get(key)); yaml.set(key, value); });
+        if (!save()) { old.forEach(yaml::set); return false; }
+        values = candidate;
+        return true;
+    }
+    public synchronized void effectiveChanged(Set<String> keys) {
+        if (keys.contains(IntConfigKey.RUNNER_COUNT.configKey())) runnerCountChanged.accept(get(IntConfigKey.RUNNER_COUNT));
+        for (var key : BooleanConfigKey.values()) if (keys.contains(key.configKey())) booleanChanged.accept(key);
+        if (keys.contains(RunnerStructureUnlockTimes.CONFIG_KEY) || keys.stream().anyMatch(key -> key.startsWith(RunnerStructureUnlockTimes.CONFIG_KEY + ".")))
+            structureUnlockTimesChanged.run();
     }
 
     private ConfigurationValues load() {

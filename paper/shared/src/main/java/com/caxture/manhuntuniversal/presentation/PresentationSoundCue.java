@@ -14,4 +14,7 @@ record PresentationSoundCue(String soundKey, float volume, float pitch) {
     void play(Player player) {
         player.playSound(player.getLocation(), soundKey, volume, pitch);
     }
+    void play(Player player, com.caxture.manhuntuniversal.i18n.LanguageService language, String id) {
+        language.sound(player, id, soundKey, volume, pitch);
+    }
 }

@@ -16,6 +16,7 @@ import com.caxture.manhuntuniversal.optimization.HunterEndAccessListener;
 import com.caxture.manhuntuniversal.optimization.OreFortuneListener;
 import com.caxture.manhuntuniversal.optimization.BlazeRodLootingListener;
 import com.caxture.manhuntuniversal.optimization.PiglinBarterListener;
+import com.caxture.manhuntuniversal.optimization.PiglinBruteSuppressionListener;
 import com.caxture.manhuntuniversal.extension.PaperExtensionService;
 import com.caxture.manhuntuniversal.api.ManhuntUniversalApi;
 import com.caxture.manhuntuniversal.api.paper.PaperManhuntUniversalApi;
@@ -46,6 +47,7 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
     private PaperTrackingClientPublisher clientPublisher;
     private IdentityDisplayService identity;
     private PaperExtensionService extensionApi;
+    private com.caxture.manhuntuniversal.persistence.RuntimePersistenceService persistence;
 
     @Override
     public void onEnable() {
@@ -56,7 +58,7 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
         gameManager.teamSelections().setForcedRandom(configuration.get(BooleanConfigKey.FORCE_RANDOM_ROLES));
         TeamSelectionPresenter teamPresenter = new TeamSelectionPresenter(language,
                 () -> !gameManager.teamSelections().forcedRandom());
-        configuration.onRunnerCountChanged(capacity -> {
+        java.util.function.IntConsumer updateRunnerCapacity = capacity -> {
             if (gameManager.activeSession().isPresent()) return;
             gameManager.teamSelections().trimRunners(capacity).forEach(playerId -> {
                 var player = getServer().getPlayer(playerId);
@@ -64,7 +66,8 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
                         configuration.get(BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS)
                                 ? "team.capacity-cleared-hidden" : "team.capacity-cleared");
             });
-        });
+        };
+        configuration.onRunnerCountChanged(updateRunnerCapacity);
         PendingPlayerState pendingPlayers = new PendingPlayerState();
         CountdownBlindnessService blindness = new CountdownBlindnessService(getServer(), pendingPlayers);
         PlayerResetService playerReset = new PlayerResetService(getServer());
@@ -99,18 +102,27 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
         activeGame = new ActiveGameCoordinator(
                 this, gameManager, configuration, pendingPlayers, blindness, playerReset,
                 identity, presentation, tracking, clock);
+        activeGame.onLobbyReturned(() -> {
+            updateRunnerCapacity.accept(configuration.get(com.caxture.manhuntuniversal.config.IntConfigKey.RUNNER_COUNT));
+            gameManager.teamSelections().snapshot().forEach(identity::updateLobbyChoice);
+        });
+        var bruteSuppression = new PiglinBruteSuppressionListener(getServer(), gameManager, configuration);
+        activeGame.onRunningEnvironmentChanged(bruteSuppression::reconcile);
+        getServer().getPluginManager().registerEvents(bruteSuppression, this);
         configuration.onBooleanChanged(activeGame::configurationChanged);
         GameStartCoordinator gameStart = new GameStartCoordinator(
                 getServer(), gameManager, configuration, language, pendingPlayers,
                 blindness, playerReset, activeGame, tracking, clock);
         extensionApi = new PaperExtensionService(this, gameManager, gameStart, activeGame, clock);
+        var configurationRegistry = extensionApi.installConfiguration(configuration, language);
+        extensionApi.installIdentity(this, identity);
+        extensionApi.installTracking(this, tracking, clientPublisher);
         activeGame.setExtensionHooks(extensionApi);
         gameManager.onVictoryDecision(extensionApi::decidingVictory);
-        getServer().getServicesManager().register(ManhuntUniversalApi.class, extensionApi, this, ServicePriority.Normal);
-        getServer().getServicesManager().register(PaperManhuntUniversalApi.class, extensionApi, this, ServicePriority.Normal);
         getServer().getPluginManager().registerEvents(extensionApi, this);
         MhuCommand handler = new MhuCommand(
                 gameManager, gameStart, activeGame, configuration, language, presentation, teamPresenter, clock);
+        handler.configurationRegistry(configurationRegistry);
         PluginCommand command = Objects.requireNonNull(getCommand("mhu"), "mhu command is missing");
         // Let the executor perform the permission check so its denial is localized per client.
         command.setPermission(null);
@@ -129,12 +141,18 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new BlazeRodLootingListener(gameManager, configuration), this);
         getServer().getPluginManager().registerEvents(new PiglinBarterListener(gameManager, configuration), this);
         getServer().getPluginManager().registerEvents(new HunterEndAccessListener(gameManager, configuration, language), this);
+        persistence=new com.caxture.manhuntuniversal.persistence.RuntimePersistenceService(this,gameManager,activeGame,gameStart,pendingPlayers,identity,tracking,configurationRegistry,clock);
+        persistence.initialize();
+        // ServiceRegisterEvent is synchronous: publish only after the saved model is installed.
+        getServer().getServicesManager().register(ManhuntUniversalApi.class, extensionApi, this, ServicePriority.Normal);
+        getServer().getServicesManager().register(PaperManhuntUniversalApi.class, extensionApi, this, ServicePriority.Normal);
     }
 
     @Override
     public void onDisable() {
         try {
-            if (activeGame != null) activeGame.disable();
+            if (persistence != null) persistence.suspend();
+            else if (activeGame != null) activeGame.disable();
         } finally {
             try {
                 if (extensionApi != null) extensionApi.shutdown();

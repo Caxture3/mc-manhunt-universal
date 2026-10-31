@@ -17,6 +17,14 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BlazeRodLootingListenerTest {
+    @Test void extensionTakeoverLeavesOriginalDropsAndExperienceUntouched() {
+        listener.coreEffect((blaze, player) -> false);
+        var original = BlazeRodDropsTest.stack(Material.BLAZE_ROD, 1, false);
+        var event = event(blaze, List.of(original));
+        listener.onDeath(event);
+        assertEquals(List.of(original), event.getDrops());
+        assertEquals(10, event.getDroppedExp()); assertEquals(0, created);
+    }
     private boolean running = true;
     private int configured = 5;
     private int existing;

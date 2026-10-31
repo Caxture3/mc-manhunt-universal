@@ -10,6 +10,13 @@ import java.util.UUID;
 public final class TrackingSelectionAuthorizationRegistry {
     private final Map<UUID, Authorization> current = new HashMap<>();
     private long nextAuthorizationId;
+    public TrackingSelectionAuthorizationRegistry() {
+        this(java.util.concurrent.ThreadLocalRandom.current().nextLong(Long.MAX_VALUE / 2));
+    }
+    TrackingSelectionAuthorizationRegistry(long seed) {
+        if(seed<0||seed>=Long.MAX_VALUE)throw new IllegalArgumentException("Invalid authorization epoch");
+        nextAuthorizationId=seed;
+    }
 
     public Authorization issue(UUID playerId, UUID sessionId) {
         Objects.requireNonNull(playerId, "playerId");

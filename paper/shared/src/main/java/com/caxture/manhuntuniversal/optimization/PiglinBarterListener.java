@@ -35,6 +35,8 @@ public final class PiglinBarterListener implements Listener {
                 || gameManager.activeSession().filter(s -> s.state() == SessionState.RUNNING).isEmpty()
                 || event.getInput().getType() != Material.GOLD_INGOT
                 || event.getOutcome().size() != 1 || isTarget(event.getOutcome().getFirst())) return;
+        if (!configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.PIGLIN_BARTERING,
+                event.getEntity(), event.getEntity().getLocation(), "piglin-barter")) return;
         PiglinBarterPolicy.Replacement replacement = PiglinBarterPolicy.replacement(
                 random.nextInt(PiglinBarterPolicy.ROLL_BOUND));
         if (replacement != PiglinBarterPolicy.Replacement.KEEP) {

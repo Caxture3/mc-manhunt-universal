@@ -46,6 +46,10 @@ game:
       §bHunters§6: §f{hunters}
     killer-section: " by §b{player}"
 config:
+  next-value: " §7(next match: {value})"
+  locked-detail: "§c[Managed by {owner}: {reason}]"
+  value-overridden: " §7(saved: {value})"
+  next-match: "Applies to the next match; locked roles and search settings stay unchanged."
   map-start: "§7- §e{key}§7 = {"
   structure-unlock-usage: "{prefix}§eUsage: /mhu config runner-structure-tracker-unlock-time.<village|bastion_remnant|nether_fortress> <seconds, -1 disables>"
   header: "{prefix}§fConfiguration:"
@@ -70,6 +74,7 @@ config:
     hide-role-assignments: "Hide role assignments"
     ore-fortune-level: "Virtual ore Fortune level"
     adjust-piglin-bartering: "Adjusted piglin bartering"
+    disable-piglin-brutes: "Disable piglin brutes"
     blaze-rod-looting-level: "Blaze rod Looting level (0–5)"
     hunter-end-restriction-enabled: "Require runner End entry before hunters"
     runner-count: "Speedrunner count"

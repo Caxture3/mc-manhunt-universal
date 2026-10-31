@@ -79,6 +79,9 @@ public final class GameStartCoordinator {
         if (countdownSeconds < 0 || countdownSeconds > 60) return OperationStatus.INVALID_ARGUMENT;
         return startDetailed(server.getConsoleSender(), countdownSeconds);
     }
+    public void resumeCountdown(GameSession session,int remaining) {
+        activeGame.beginCountdown(session,remaining,()->activate(session,server.getConsoleSender()));
+    }
 
     private OperationStatus startDetailed(CommandSender sender, int countdownSeconds) {
         return activeGame.extensionHooks().inMutation(() -> doStart(sender, countdownSeconds));

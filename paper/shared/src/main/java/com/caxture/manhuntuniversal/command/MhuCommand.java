@@ -43,6 +43,11 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
     private final MatchPresentation presentation;
     private final Clock clock;
     private final TeamSelectionPresenter teamPresenter;
+    private RegistryConfigCommands registryCommands;
+
+    public void configurationRegistry(com.caxture.manhuntuniversal.extension.config.ConfigurationRegistryService registry) {
+        registryCommands = new RegistryConfigCommands(registry, language);
+    }
 
     public MhuCommand(
             GameManager gameManager,
@@ -176,6 +181,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
     }
 
     private void config(CommandSender sender, String[] args) {
+        if (registryCommands != null) { registryCommands.handle(sender, args); return; }
         if (args.length == 1) {
             language.send(sender, "config.header");
             for (IntConfigKey key : IntConfigKey.values()) {
@@ -293,7 +299,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
                     }, ClickCallback.Options.builder().uses(ClickCallback.UNLIMITED_USES)
                             .lifetime(Duration.ofHours(1)).build());
         }
-        sender.sendMessage(InteractiveMessages.configEntry(line, key, click));
+        language.sendComponent(sender, "core:config." + key, InteractiveMessages.configEntry(line, key, click));
     }
 
     private void sendStructureUnlockGroup(CommandSender sender) {
@@ -305,7 +311,8 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         entries.put("village", Integer.toString(times.village()));
         entries.put("bastion_remnant", Integer.toString(times.bastionRemnant()));
         entries.put("nether_fortress", Integer.toString(times.netherFortress()));
-        InteractiveMessages.configMap(heading, key, entries, sender instanceof Player).forEach(sender::sendMessage);
+        InteractiveMessages.configMap(heading, key, entries, sender instanceof Player)
+                .forEach(line -> language.sendComponent(sender, "core:config." + key, line));
     }
 
     @Override
@@ -316,6 +323,8 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             String[] args
     ) {
         boolean admin = CommandAccessPolicy.adminAllowed(sender.hasPermission(ADMIN_PERMISSION));
+        if (registryCommands != null && admin && args.length >= 2 && args[0].equalsIgnoreCase("config"))
+            return registryCommands.complete(args);
         List<String> candidates = new ArrayList<>();
         if (args.length == 1) {
             if (sender instanceof Player && !gameManager.teamSelections().forcedRandom()) candidates.add("join");

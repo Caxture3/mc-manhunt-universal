@@ -10,8 +10,14 @@ final class ExtensionRegistry {
     private final Runnable requireThread;
     private final Set<Entry> entries = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<ControlDomain, Entry> domains = new EnumMap<>(ControlDomain.class);
+    private java.util.function.Consumer<ExtensionRegistration> closing = ignored -> {};
 
     ExtensionRegistry(Runnable requireThread) { this.requireThread = requireThread; }
+
+    void onClosing(java.util.function.Consumer<ExtensionRegistration> listener) { closing = listener; }
+    boolean owns(ExtensionRegistration token) {
+        return token instanceof Entry entry && entries.contains(entry) && entry.active && entry.owner.isEnabled();
+    }
 
     RegistrationResult register(Plugin owner, ExtensionOptions options) {
         requireThread.run();
@@ -80,6 +86,7 @@ final class ExtensionRegistry {
             active = false;
             entries.remove(this);
             domains.entrySet().removeIf(value -> value.getValue() == this);
+            closing.accept(this);
         }
     }
 }

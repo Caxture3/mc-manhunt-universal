@@ -49,6 +49,8 @@ public final class OreFortuneListener implements Listener {
         int level = OreFortuneDrops.upgradedLevel(configured,
                 held.getEnchantmentLevel(Enchantment.FORTUNE), held.containsEnchantment(Enchantment.SILK_TOUCH));
         if (level == 0 || !block.isValidTool(held)) return;
+        if (!configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.ORE_FORTUNE,
+                player, block.getLocation(), "ore-prepare")) return;
 
         // BlockDropItemEvent runs after tool damage: the original tool may have broken.
         ItemStack virtualTool = held.clone();
@@ -63,6 +65,8 @@ public final class OreFortuneListener implements Listener {
     public void onBlockDrop(BlockDropItemEvent event) {
         ItemStack virtualTool = pendingTools.remove(BreakKey.of(event.getPlayer(), event.getBlock()));
         if (virtualTool == null || event.isCancelled() || !running()) return;
+        if (!configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.ORE_FORTUNE,
+                event.getPlayer(), event.getBlock().getLocation(), "ore-drop")) return;
         BlockState original = event.getBlockState();
         Material oreDrop = OreFortuneDrops.oreDrop(original.getType());
         if (oreDrop == null) return;

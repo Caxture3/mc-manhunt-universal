@@ -140,6 +140,13 @@ final class NearbyStructureProbe {
         while (checked.size() > 512) checked.remove(checked.keySet().iterator().next());
     }
 
+    void invalidate(java.util.function.BiPredicate<UUID, TrackingTargetId> matches) {
+        pending.keySet().removeIf(query -> matches.test(query.world(), query.target()));
+        checked.keySet().removeIf(query -> matches.test(query.world(), query.target()));
+        // I/O permits remain held until the actual futures finish. Discarded queries cannot publish.
+        index.invalidate(matches);
+    }
+
     void unload(UUID world) {
         pending.keySet().removeIf(query -> query.world().equals(world));
         checked.keySet().removeIf(query -> query.world().equals(world));

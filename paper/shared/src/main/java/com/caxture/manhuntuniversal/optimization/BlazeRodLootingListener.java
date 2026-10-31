@@ -24,6 +24,8 @@ public final class BlazeRodLootingListener implements Listener {
     private final IntSupplier configured;
     private final RandomGenerator random;
     private final LootAccess loot;
+    private java.util.function.BiPredicate<Blaze, Player> coreEffect = (blaze, player) -> true;
+    void coreEffect(java.util.function.BiPredicate<Blaze, Player> effect) { coreEffect = effect; }
 
     public BlazeRodLootingListener(GameManager games, ConfigurationService configuration) {
         this(() -> games.activeSession().filter(session -> session.state() == SessionState.RUNNING).isPresent(),
@@ -37,6 +39,8 @@ public final class BlazeRodLootingListener implements Listener {
                     }
                     @Override public ItemStack rods(int count) { return new ItemStack(Material.BLAZE_ROD, count); }
                 });
+        coreEffect = (blaze, player) -> configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.BLAZE_ROD_LOOTING,
+                player, blaze.getLocation(), "entity-death");
     }
 
     BlazeRodLootingListener(BooleanSupplier running, IntSupplier configured, RandomGenerator random, LootAccess loot) {
@@ -56,6 +60,7 @@ public final class BlazeRodLootingListener implements Listener {
         int existing = Math.max(0, loot.looting(player));
         int level = BlazeRodDrops.upgradedLevel(minimum, existing);
         if (level == 0 || !BlazeRodDrops.canReplace(event.getDrops(), existing)) return;
+        if (!coreEffect.test(blaze, player)) return;
         int count = BlazeRodDrops.count(random.nextInt(2), random.nextFloat(), level);
         // Let Paper commit the final drops only if the death remains uncancelled.
         BlazeRodDrops.replace(event.getDrops(), count, loot::rods);

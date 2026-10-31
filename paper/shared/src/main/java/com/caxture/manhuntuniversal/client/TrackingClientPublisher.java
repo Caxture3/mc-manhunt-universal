@@ -7,6 +7,8 @@ import org.bukkit.entity.Player;
 import java.util.UUID;
 
 public interface TrackingClientPublisher {
+    default boolean openDynamic(Player player, com.caxture.manhuntuniversal.protocol.DynamicTrackingOpen message) { return false; }
+    default boolean updateDynamic(Player player, com.caxture.manhuntuniversal.protocol.DynamicTrackingUpdate message) { return false; }
     boolean supportsCompatibleClient(UUID playerId);
 
     void openTrackingSelection(Player player, UUID sessionId, long authorizationId,

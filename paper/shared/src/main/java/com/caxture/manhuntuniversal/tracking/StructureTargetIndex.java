@@ -126,16 +126,22 @@ final class StructureTargetIndex {
         }
     }
 
-    void unload(UUID world) {
+    void invalidate(BiPredicate<UUID, TrackingTargetId> matches) {
         entries.entrySet().removeIf(entry -> {
-            if (!entry.getKey().world.equals(world)) return false;
+            if (!matches.test(entry.getKey().world, entry.getKey().target)) return false;
             pieces -= entry.getValue().weight();
             return true;
         });
     }
 
+    void unload(UUID world) { invalidate((id, target) -> id.equals(world)); }
+
     void clear() { entries.clear(); pieces = 0; }
     int size() { return entries.size(); }
+    boolean confirmedSpawner(UUID world, double x, double y, double z) {
+        return entries.entrySet().stream().filter(entry -> entry.getKey().world.equals(world)).flatMap(entry -> entry.getValue().spawners.stream())
+                .anyMatch(point -> point.x() == x && point.y() == y && point.z() == z);
+    }
 
     private static TrackingPosition at(TrackingPosition viewer, double x, double y, double z) {
         return new TrackingPosition(viewer.worldId(), viewer.worldKind(), x, y, z);

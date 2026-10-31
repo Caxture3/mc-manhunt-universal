@@ -15,6 +15,10 @@ public final class LanguageTemplateResolver {
 
     private LanguageTemplateResolver() {
     }
+    public static String extension(YamlConfiguration external, String key, String english, String localized) {
+        Object value=external.get(key);
+        return value instanceof String candidate && MessageTemplateValidator.samePlaceholders(candidate,english) ? candidate : localized;
+    }
 
     public static String resolve(
             YamlConfiguration external,

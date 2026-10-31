@@ -32,11 +32,15 @@ public final class NetherPortalProtectionListener implements Listener {
     private final BooleanSupplier running;
     private final BooleanSupplier enabled;
     private final Consumer<Player> denied;
+    private java.util.function.BiPredicate<Block, Player> coreEffect = (block, player) -> true;
+    void coreEffect(java.util.function.BiPredicate<Block, Player> effect) { coreEffect = effect; }
 
     public NetherPortalProtectionListener(GameManager games, ConfigurationService configuration, LanguageService language) {
         this(() -> games.activeSession().filter(session -> session.state() == SessionState.RUNNING).isPresent(),
                 () -> configuration.get(BooleanConfigKey.PREVENT_NETHER_PORTAL_DESTRUCTION),
                 player -> language.send(player, "restriction.nether-portal-destruction-denied"));
+        coreEffect = (block, player) -> configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.NETHER_PORTAL_PROTECTION,
+                player, block.getLocation(), "portal-block-change");
     }
 
     NetherPortalProtectionListener(BooleanSupplier running, BooleanSupplier enabled, Consumer<Player> denied) {
@@ -48,8 +52,11 @@ public final class NetherPortalProtectionListener implements Listener {
     private boolean active() { return running.getAsBoolean() && enabled.getAsBoolean(); }
     private boolean protectedBlock(Block block) { return protectedBlock(block, block.getType()); }
     private boolean protectedBlock(Block block, Material original) {
+        return protectedBlock(block, original, null);
+    }
+    private boolean protectedBlock(Block block, Material original, Player actor) {
         if (original != Material.NETHER_PORTAL && original != Material.OBSIDIAN) return false;
-        return NetherPortalProtection.isProtected(block, original, active());
+        return NetherPortalProtection.isProtected(block, original, active()) && coreEffect.test(block, actor);
     }
     private void cancel(Block block, Cancellable event) {
         if (protectedBlock(block)) event.setCancelled(true);
@@ -57,7 +64,7 @@ public final class NetherPortalProtectionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
-        if (protectedBlock(event.getBlock())) {
+        if (protectedBlock(event.getBlock(), event.getBlock().getType(), event.getPlayer())) {
             event.setCancelled(true);
             denied.accept(event.getPlayer());
         }
@@ -68,7 +75,7 @@ public final class NetherPortalProtectionListener implements Listener {
         // Multi-place inherits the BlockPlaceEvent handler list; inspect every original state.
         List<BlockState> originals = event instanceof BlockMultiPlaceEvent multi
                 ? multi.getReplacedBlockStates() : List.of(event.getBlockReplacedState());
-        if (originals.stream().anyMatch(old -> protectedBlock(old.getBlock(), old.getType()))) {
+        if (originals.stream().anyMatch(old -> protectedBlock(old.getBlock(), old.getType(), event.getPlayer()))) {
             event.setCancelled(true);
             event.setBuild(false);
             denied.accept(event.getPlayer());
@@ -97,7 +104,7 @@ public final class NetherPortalProtectionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBucket(PlayerBucketEmptyEvent event) {
-        if (protectedBlock(event.getBlock())) {
+        if (protectedBlock(event.getBlock(), event.getBlock().getType(), event.getPlayer())) {
             event.setCancelled(true);
             denied.accept(event.getPlayer());
         }
@@ -116,7 +123,8 @@ public final class NetherPortalProtectionListener implements Listener {
         // not target coordinates; it cannot replace the solid frame in front of the dispenser.
         Block destination = loadedBlock(source.getWorld(), source.getX() + face.getModX(),
                 source.getY() + face.getModY(), source.getZ() + face.getModZ());
-        if (destination == null || destination.getType() == Material.NETHER_PORTAL && protectedBlock(destination)) {
+        if (destination == null && coreEffect.test(source, null)
+                || destination != null && destination.getType() == Material.NETHER_PORTAL && protectedBlock(destination)) {
             event.setCancelled(true);
         }
     }
@@ -144,7 +152,7 @@ public final class NetherPortalProtectionListener implements Listener {
     private boolean protectedDestination(Block source, BlockFace direction) {
         Block destination = loadedBlock(source.getWorld(), source.getX() + direction.getModX(),
                 source.getY() + direction.getModY(), source.getZ() + direction.getModZ());
-        return destination == null || protectedBlock(destination);
+        return destination == null ? coreEffect.test(source, null) : protectedBlock(destination);
     }
 
     private static Block loadedBlock(World world, int x, int y, int z) {

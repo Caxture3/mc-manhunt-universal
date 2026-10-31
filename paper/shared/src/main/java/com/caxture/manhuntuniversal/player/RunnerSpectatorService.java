@@ -18,6 +18,8 @@ public final class RunnerSpectatorService {
     private final GameManager gameManager;
     private final Consumer<Runnable> nextTick;
     private final Map<UUID, OriginalMode> originals = new HashMap<>();
+    public Map<UUID, OriginalMode> snapshot() { return Map.copyOf(originals); }
+    public void restoreSnapshot(Map<UUID, OriginalMode> saved) { originals.clear();originals.putAll(saved); }
 
     public RunnerSpectatorService(Server server, GameManager gameManager, Consumer<Runnable> nextTick) {
         this.server = server;
@@ -117,5 +119,7 @@ public final class RunnerSpectatorService {
         if (!stillEliminated(player.getUniqueId(), original)) originals.remove(player.getUniqueId(), original);
     }
 
-    private record OriginalMode(UUID sessionId, GameMode gameMode) {}
+    public record OriginalMode(UUID sessionId, GameMode gameMode) {
+        public OriginalMode { java.util.Objects.requireNonNull(sessionId);java.util.Objects.requireNonNull(gameMode); }
+    }
 }

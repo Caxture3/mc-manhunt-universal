@@ -15,6 +15,9 @@ public final class ProtocolCodec {
     private static final int TRACKING_SELECTION_CHOOSE = 4;
     private static final int TRACKING_SELECTION_CLOSE = 5;
     private static final int TRACKING_SELECTION_UPDATE = 6;
+    private static final int DYNAMIC_TRACKING_OPEN = 7;
+    private static final int DYNAMIC_TRACKING_UPDATE = 8;
+    private static final int DYNAMIC_TRACKING_CHOOSE = 9;
 
     private ProtocolCodec() {
     }
@@ -24,6 +27,19 @@ public final class ProtocolCodec {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             try (DataOutputStream output = new DataOutputStream(bytes)) {
                 switch (message) {
+                    case DynamicTrackingOpen open -> {
+                        output.writeByte(DYNAMIC_TRACKING_OPEN);
+                        DynamicTrackingWire.writeCatalog(output, open.protocolVersion(), open.sessionId(), open.authorizationId(), open.directoryRevision(), open.currentSelection(), open.targets());
+                    }
+                    case DynamicTrackingUpdate update -> {
+                        output.writeByte(DYNAMIC_TRACKING_UPDATE);
+                        DynamicTrackingWire.writeCatalog(output, update.protocolVersion(), update.sessionId(), update.authorizationId(), update.directoryRevision(), update.currentSelection(), update.targets());
+                    }
+                    case DynamicTrackingChoose choose -> {
+                        output.writeByte(DYNAMIC_TRACKING_CHOOSE);
+                        DynamicTrackingWire.writeHeader(output, choose.protocolVersion(), choose.sessionId(), choose.authorizationId(), choose.directoryRevision());
+                        DynamicTrackingWire.string(output, choose.targetId());
+                    }
                     case ClientHello hello -> {
                         output.writeByte(CLIENT_HELLO);
                         output.writeInt(hello.protocolVersion());
@@ -82,6 +98,9 @@ public final class ProtocolCodec {
         try (DataInputStream input = new DataInputStream(
                 new ByteArrayInputStream(payload))) {
             ProtocolMessage message = switch (input.readUnsignedByte()) {
+                case DYNAMIC_TRACKING_OPEN -> DynamicTrackingWire.readOpen(input);
+                case DYNAMIC_TRACKING_UPDATE -> DynamicTrackingWire.readUpdate(input);
+                case DYNAMIC_TRACKING_CHOOSE -> DynamicTrackingWire.readChoose(input);
                 case CLIENT_HELLO -> new ClientHello(input.readInt());
                 case SERVER_HELLO -> new ServerHello(
                         input.readInt(), input.readBoolean());
@@ -116,7 +135,7 @@ public final class ProtocolCodec {
         }
     }
 
-    private static void writeUuid(DataOutputStream output, UUID value) throws IOException {
+    static void writeUuid(DataOutputStream output, UUID value) throws IOException {
         output.writeLong(value.getMostSignificantBits());
         output.writeLong(value.getLeastSignificantBits());
     }
@@ -132,7 +151,7 @@ public final class ProtocolCodec {
         return new TrackingAvailability(input.readLong(), input.readLong(), input.readLong());
     }
 
-    private static UUID readUuid(DataInputStream input) throws IOException {
+    static UUID readUuid(DataInputStream input) throws IOException {
         return new UUID(input.readLong(), input.readLong());
     }
 }

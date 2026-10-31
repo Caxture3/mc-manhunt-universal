@@ -1,6 +1,14 @@
 package com.caxture.manhuntuniversal.extension;
 
 import com.caxture.manhuntuniversal.api.*;
+import com.caxture.manhuntuniversal.api.config.*;
+import com.caxture.manhuntuniversal.api.feature.*;
+import com.caxture.manhuntuniversal.api.tracking.*;
+import com.caxture.manhuntuniversal.api.text.TextContext;
+import com.caxture.manhuntuniversal.api.paper.presentation.*;
+import com.caxture.manhuntuniversal.extension.config.ConfigurationRegistryService;
+import com.caxture.manhuntuniversal.extension.tracking.TrackingRegistryService;
+import com.caxture.manhuntuniversal.client.DynamicTrackingMessages;
 import com.caxture.manhuntuniversal.api.paper.event.*;
 import com.caxture.manhuntuniversal.game.*;
 import org.bukkit.Bukkit;
@@ -23,6 +31,54 @@ import java.util.logging.Logger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PaperExtensionServiceTest {
+    @Test void publicRegistriesShareARealOwnerAndDisableRestoresBothMenuRoutes() throws Exception {
+        Harness h = new Harness();
+        // Replace only the live-world adapters: ownership, entrypoints and disable dispatch are real.
+        var childrenField = PaperExtensionService.class.getDeclaredField("children"); childrenField.setAccessible(true);
+        OwnedRegistry children = (OwnedRegistry) childrenField.get(h.service);
+        var configs = new ConfigurationRegistryService(children, ignored -> {});
+        var configField = PaperExtensionService.class.getDeclaredField("configurationRegistry"); configField.setAccessible(true); configField.set(h.service, configs);
+        String[] selected = {null}; UUID world = UUID.randomUUID();
+        var targets = new TrackingRegistryService(children, new TrackingRegistryService.Runtime() {
+            public Optional<TrackingViewerContext> viewer(UUID id) { return Optional.of(new TrackingViewerContext(id,"en_us",new WorldPosition(world,0,70,0),"overworld",Optional.of(h.snapshot()),NOW)); }
+            public boolean maySelect(UUID id) { return true; }
+            public Optional<String> selection(UUID id) { return Optional.ofNullable(selected[0]); }
+            public void selection(UUID id,String target) { selected[0]=target; }
+            public Optional<TrackingSnapshot> snapshot(UUID id) { return Optional.empty(); }
+            public void refresh(UUID id) { }
+            public void invalidate(TrackingInvalidation scope) { }
+            public void catalogChanged() { }
+        });
+        var trackingField = PaperExtensionService.class.getDeclaredField("trackingRegistry"); trackingField.setAccessible(true); trackingField.set(h.service,targets);
+        com.caxture.manhuntuniversal.api.paper.PaperManhuntUniversalApi api = h.service;
+        var owner = h.register("example:integrated",Set.of());
+        assertEquals("1.1.0",api.apiVersion());
+        assertTrue(api.capabilities().containsAll(Set.of(Capability.CONFIGURATION_REGISTRY,Capability.DYNAMIC_TRACKING)));
+        int[] stored = {1};
+        assertTrue(api.configuration().register(owner,new ConfigDefinition<>("example:count",LocalizedText.of("Count"),LocalizedText.of(""),1,
+                ConfigTypes.integers(0,10),new ConfigStorage<Integer>() {public Integer read(){return stored[0];}public boolean save(Integer value){stored[0]=value;return true;}},ConfigTiming.IMMEDIATE,"")).successful());
+        assertTrue(api.configuration().update(owner,"example:count",3,-1).successful());
+        assertTrue(api.texts().override(owner,"prefix",10,context->"example-prefix").successful());
+        var text = new TextContext("prefix","en_us",Optional.of(A),Map.of());
+        assertEquals("example-prefix",api.texts().resolve(text).orElseThrow());
+        assertTrue(api.tracking().register(owner,new TrackingTargetDefinition("example:checkpoint",LocalizedText.of("Checkpoint"),TrackingWorld.current(),
+                (request,cancellation)->java.util.concurrent.CompletableFuture.completedFuture(LocateResult.notFound("test")))).successful());
+        var menu = api.tracking().menu(A).orElseThrow();
+        assertEquals("example:checkpoint",DynamicTrackingMessages.open(h.session.id(),1,menu).targets().getFirst().id());
+        assertTrue(api.tracking().select(new TrackingMutation(h.context(owner),A,menu.revision()),"example:checkpoint").successful());
+        var selector = new PresentationSelector(Set.of(PresentationChannel.PAPER_MENU,PresentationChannel.FABRIC_MENU),"",Optional.empty(),false);
+        assertTrue(api.presentation().intercept(owner,selector,10,request->PresentationDecision.cancel()).successful());
+        var receiver = proxy(org.bukkit.command.CommandSender.class,(object,method,args)->{throw new UnsupportedOperationException(method.getName());});
+        var payload = PresentationPayload.text(net.kyori.adventure.text.Component.text("menu"));
+        for(var channel:selector.channels())assertTrue(h.service.presentationService().process(new PresentationRequest("test:menu",channel,receiver,payload,Optional.of(h.snapshot()),Optional.empty(),false)).cancelled());
+        var serverField = Bukkit.class.getDeclaredField("server");serverField.setAccessible(true);Object original=serverField.get(null);
+        try { serverField.set(null,h.server);h.service.pluginDisabled(new PluginDisableEvent(h.owner)); }
+        finally { serverField.set(null,original); }
+        assertFalse(owner.active());assertNull(selected[0]);assertEquals(3,stored[0]);
+        assertTrue(api.configuration().find("example:count").isEmpty());assertTrue(api.texts().resolve(text).isEmpty());
+        assertTrue(api.tracking().menu(A).orElseThrow().options().isEmpty());
+        for(var channel:selector.channels())assertFalse(h.service.presentationService().process(new PresentationRequest("test:menu",channel,receiver,payload,Optional.of(h.snapshot()),Optional.empty(),false)).cancelled());
+    }
     private static final Instant NOW = Instant.parse("2026-10-25T00:00:00Z");
     private static final UUID A = new UUID(0, 1), B = new UUID(0, 2), C = new UUID(0, 3), D = new UUID(0, 4);
 
