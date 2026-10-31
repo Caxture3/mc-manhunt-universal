@@ -287,12 +287,12 @@ public final class ActiveGameCoordinator {
     }
 
     public boolean playerAvailableForRoleChange(UUID playerId) {
-        Player player = server.getPlayer(playerId);
-        return player != null && player.isOnline() && !player.isDead() && !pendingPlayers.needsReset(playerId);
+        return RoleChangeAvailability.available(server, pendingPlayers, playerId);
     }
 
     public void rolesChanged(GameSession session) {
         requireRunningSession(session);
+        var knownPositions=tracking.positionSnapshot();
         // Revoke every old UI capability, search token and bound compass before issuing new roles.
         tracking.finish(session);
         requireRunningSession(session);
@@ -300,7 +300,7 @@ public final class ActiveGameCoordinator {
         requireRunningSession(session);
         identity.begin(session);
         requireRunningSession(session);
-        tracking.start(session);
+        tracking.resume(session,knownPositions,java.util.Map.of());
         requireRunningSession(session);
         presentation.showRolesChanged(session);
         // A newly assigned runner may already be in the End.

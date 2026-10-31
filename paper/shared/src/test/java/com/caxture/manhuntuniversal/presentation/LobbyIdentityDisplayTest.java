@@ -21,6 +21,19 @@ class LobbyIdentityDisplayTest {
     private final Fixture fixture = new Fixture();
     private final IdentityDisplayService display = new IdentityDisplayService(fixture.server);
 
+    @Test void roleChangedWhileOfflineIsAppliedOnRejoinAndTheOriginalDisplayStillRestores() {
+        var manager=new GameManager(new RoleAssigner(new Random(0)));UUID other=new UUID(0,2);
+        manager.teamSelections().choose(fixture.id,TeamPreference.RUNNER,1);
+        var session=manager.start(List.of(new Participant(fixture.id,"Player"),new Participant(other,"Other")),
+                new MatchSettings(1,false,new TrackingSettingsSnapshot(512,30,4096)),Instant.EPOCH).session().orElseThrow();
+        manager.activate(session.id(),Instant.EPOCH);display.begin(session);fixture.online=false;
+        assertTrue(manager.assignRoles(session.id(),Map.of(fixture.id,Role.HUNTER,other,Role.RUNNER),Instant.EPOCH));
+        display.clear(session);display.begin(session);fixture.online=true;
+        display.restorePending(fixture.player);display.applyJoiningPlayer(session,fixture.player);
+        assertEquals(NamedTextColor.AQUA,fixture.listName.color());assertEquals(NamedTextColor.AQUA,fixture.entryTeam().color());
+        display.clear(session);fixture.assertOriginal();
+    }
+
     @Test
     void switchingPreviewsAndReturningToRandomRestoresOriginalTeamAndTabName() {
         display.updateLobbyChoice(fixture.id, TeamPreference.HUNTER);

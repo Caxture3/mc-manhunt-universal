@@ -7,7 +7,8 @@ import java.util.UUID;
 public interface RoleController {
     /**
      * Assigns every participant exactly once. Eliminated roles must remain unchanged.
-     * Changed players must be online and available; the match must retain a living runner and hunter.
+     * Offline participants may change roles, with platform effects applied on rejoin.
+     * Changed online players must be alive and have no pending reset; the match must retain a living runner and hunter.
      * Rejection or event cancellation leaves roles unchanged.
      * @param context ownership, session, and revision checks for this request
      * @param assignments complete participant-to-role assignment
@@ -15,10 +16,11 @@ public interface RoleController {
      */
     OperationResult assign(MutationContext context, Map<UUID, TeamRole> assignments);
     /**
-     * Randomizes available living participants, retaining offline and eliminated roles.
-     * runnerCount is the final number of uneliminated runners, including fixed offline runners.
+     * Randomizes eligible uneliminated participants, including offline players.
+     * Eliminated roles and unavailable online players retain their roles.
+     * runnerCount is the final number of uneliminated runners, including fixed unavailable online runners.
      * @param context ownership, session, and revision checks for this request
-     * @param runnerCount final number of living runners including fixed offline runners
+     * @param runnerCount final number of uneliminated runners including fixed unavailable online runners
      * @return the requested value or operation outcome
      */
     OperationResult reroll(MutationContext context, int runnerCount);

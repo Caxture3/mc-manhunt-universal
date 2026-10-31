@@ -133,9 +133,12 @@ public final class CompassTrackingService {
     }
 
     public void start(GameSession session) {
+        start(session,Map.of());
+    }
+    private void start(GameSession session,Map<UUID,List<TrackingPosition>> knownPositions) {
         stopSearchTicker();
         clearRuntimeState();
-        state = new TrackingSessionState(session.id());
+        state = new TrackingSessionState(session.id(),knownPositions);
         settings = session.settings().trackingSettings();
         if (extensions != null) extensions.begin(session);
         unlockAnnouncements.begin(session.id(), availability(session,
@@ -153,9 +156,8 @@ public final class CompassTrackingService {
     public Map<UUID,String> selectionSnapshot() { return extensions==null?Map.of():extensions.selectionSnapshot(); }
     public Map<UUID,List<TrackingPosition>> positionSnapshot() { return state==null?Map.of():state.positionSnapshot(); }
     public void resume(GameSession session,Map<UUID,List<TrackingPosition>> positions,Map<UUID,String> selections) {
-        start(session);
+        start(session,positions);
         if(state==null||!state.sessionId().equals(session.id()))return;
-        state.restorePositions(positions);
         if(extensions!=null)extensions.restoreSelections(selections);
         tick(session);
     }

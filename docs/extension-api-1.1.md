@@ -124,3 +124,5 @@ api.tracking().register(owner, new TrackingTargetDefinition(
 构建与测试记录见[本次验证记录](verification/api-1.1.md)。编译检查不等同于游戏验证：未运行真实客户端画面、资源包接受/重载、网络包与其他插件的组合兼容测试，也未进行实服性能采样。
 
 核心现支持正常重启续局：已有会话在服务注册完成时即可查询；扩展须在自身 onEnable 检查当前会话并恢复自己的任务/数据。RUNNING 续局不重发新开局事件。见[续局职责说明](runtime-continuity.md)。
+
+`roles().assign` 与 `roles().reroll` 现支持离线且未淘汰的参与者；在线死亡/待重置者仍保留安全限制。离线变更在重连时应用，未淘汰状态、待重置记录、末地解锁和已知位置会保留，见[角色接口规则](extension-api.md)。

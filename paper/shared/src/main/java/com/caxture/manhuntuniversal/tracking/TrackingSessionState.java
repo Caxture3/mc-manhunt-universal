@@ -18,6 +18,10 @@ public final class TrackingSessionState {
     public TrackingSessionState(UUID sessionId) {
         this.sessionId = sessionId;
     }
+    public TrackingSessionState(UUID sessionId,Map<UUID,java.util.List<TrackingPosition>> knownPositions) {
+        this(sessionId);
+        restorePositions(knownPositions);
+    }
 
     public UUID sessionId() {
         return sessionId;

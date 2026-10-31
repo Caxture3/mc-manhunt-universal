@@ -344,7 +344,7 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
             Role old = session.roleOf(id).orElseThrow();
             if (!old.name().equals(proposed.get(id).name())) {
                 if (session.isEliminatedParticipant(id)) return result(OperationStatus.INVALID_ASSIGNMENT, "Eliminated roles must be preserved");
-                if (!runtime.available(id)) return result(OperationStatus.PLAYER_UNAVAILABLE, "Changed players must be online, alive and ready");
+                if (!runtime.available(id)) return result(OperationStatus.PLAYER_UNAVAILABLE, "Changed online players must be alive and ready; offline participants are allowed");
             }
             if (!session.isEliminatedParticipant(id)) {
                 if (proposed.get(id) == TeamRole.RUNNER) runners++; else hunters++;

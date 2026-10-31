@@ -219,7 +219,58 @@ class PaperExtensionServiceTest {
         assertTrue(h.events.stream().noneMatch(RolesChangedEvent.class::isInstance));
     }
 
-    @Test void rerollCountsFixedOfflineRunnersAndKeepsEliminatedPlayers() {
+    @Test void offlineAssignmentsPreservePendingResetDebtAndCanBeSavedForRestart() {
+        Harness h=new Harness();var owner=h.register("offline",Set.of(ControlDomain.ROLES));
+        h.offline.addAll(Set.of(A,C));h.pending.markResetPending(A);h.pending.markResetPending(C);
+        UUID end=UUID.randomUUID();h.manager.bindTargetEnd(h.session.id(),B,end);
+        assertEquals(OperationStatus.OK,h.service.roles().assign(h.context(owner),h.swapped()).status());
+        assertEquals(TeamRole.HUNTER,h.snapshot().participants().get(A).role());
+        assertEquals(TeamRole.RUNNER,h.snapshot().participants().get(C).role());
+        assertTrue(h.pending.needsReset(A));assertTrue(h.pending.needsReset(C));
+        assertEquals(Optional.of(end),h.session.targetEndWorldId());assertEquals(Optional.of(NOW),h.session.startedAt());
+        var restarted=new GameManager(new RoleAssigner(new Random(9)));assertTrue(restarted.restore(h.session.snapshot()));
+        assertEquals(Optional.of(Role.HUNTER),restarted.activeSession().orElseThrow().roleOf(A));
+        assertEquals(Optional.of(Role.RUNNER),restarted.activeSession().orElseThrow().roleOf(C));
+        assertEquals(1,h.rolesSynced);assertEquals(1,h.events.stream().filter(RolesChangedEvent.class::isInstance).count());
+    }
+
+    @Test void goingOfflineDuringTheChangingEventDoesNotInvalidateTheAssignment() {
+        Harness h=new Harness();var owner=h.register("disconnect",Set.of(ControlDomain.ROLES));
+        h.listener=event->{if(event instanceof RolesChangingEvent)h.offline.addAll(Set.of(A,C));};
+        assertEquals(OperationStatus.OK,h.service.roles().assign(h.context(owner),h.swapped()).status());
+        assertEquals(TeamRole.HUNTER,h.snapshot().participants().get(A).role());assertEquals(1,h.rolesSynced);
+    }
+
+    @Test void comingOnlineBeforeCommitRechecksPendingResetWithoutPartiallyChangingRoles() {
+        Harness h=new Harness();var owner=h.register("reconnect",Set.of(ControlDomain.ROLES));
+        h.offline.add(A);h.pending.markResetPending(A);var before=h.snapshot();
+        h.listener=event->{if(event instanceof RolesChangingEvent)h.offline.remove(A);};
+        assertEquals(OperationStatus.PLAYER_UNAVAILABLE,h.service.roles().assign(h.context(owner),h.swapped()).status());
+        assertEquals(before,h.snapshot());assertEquals(0,h.rolesSynced);assertTrue(h.pending.needsReset(A));
+    }
+
+    @Test void rerollCanRemoveAnOfflineRunnerAndSelectAnOfflineHunter() {
+        Harness first=new Harness();var owner=first.register("offline-runner",Set.of(ControlDomain.ROLES));
+        first.offline.add(A);first.unavailable.addAll(Set.of(B,C,D));
+        assertEquals(OperationStatus.OK,first.service.roles().reroll(first.context(owner),1).status());
+        assertEquals(List.of(B),first.session.livingRunnerIds());assertEquals(Optional.of(Role.HUNTER),first.session.roleOf(A));
+        Harness second=new Harness();var other=second.register("offline-hunter",Set.of(ControlDomain.ROLES));
+        second.offline.add(C);second.unavailable.addAll(Set.of(A,B,D));
+        assertEquals(OperationStatus.OK,second.service.roles().reroll(second.context(other),3).status());
+        assertEquals(Optional.of(Role.RUNNER),second.session.roleOf(C));assertEquals(List.of(D),second.session.livingHunterIds());
+    }
+
+    @Test void allOfflineParticipantsCanBeRerolledButEliminatedRolesRemainFixed() {
+        Harness h=new Harness();var owner=h.register("all-offline",Set.of(ControlDomain.ROLES));h.offline.addAll(Set.of(A,B,C,D));
+        h.manager.eliminateParticipant(h.session.id(),D,Optional.empty(),NOW);
+        assertEquals(OperationStatus.OK,h.service.roles().reroll(h.context(owner),1).status());
+        assertEquals(1,h.session.livingRunnerIds().size());assertEquals(2,h.session.livingHunterIds().size());
+        assertTrue(h.session.isEliminatedParticipant(D));assertEquals(Optional.of(Role.HUNTER),h.session.roleOf(D));
+        var invalid=new LinkedHashMap<UUID,TeamRole>();h.snapshot().participants().forEach((id,player)->invalid.put(id,player.role()));invalid.put(D,TeamRole.RUNNER);
+        assertEquals(OperationStatus.INVALID_ASSIGNMENT,h.service.roles().assign(h.context(owner),invalid).status());
+    }
+
+    @Test void rerollCountsFixedUnreadyOnlineRunnersAndKeepsEliminatedPlayers() {
         Harness h = new Harness();
         ExtensionRegistration roles = h.register("roles", Set.of(ControlDomain.ROLES));
         h.unavailable.add(A);
@@ -233,7 +284,7 @@ class PaperExtensionServiceTest {
         assertEquals(OperationStatus.INVALID_ASSIGNMENT, h.service.roles().reroll(h.context(roles), 3).status());
     }
 
-    @Test void rerollAllowsAllCandidatesWhenAnOfflineHunterKeepsTheTeamsValid() {
+    @Test void rerollAllowsAllCandidatesWhenAnUnreadyOnlineHunterKeepsTheTeamsValid() {
         Harness h = new Harness();
         ExtensionRegistration roles = h.register("roles", Set.of(ControlDomain.ROLES));
         h.unavailable.add(D);
@@ -332,6 +383,8 @@ class PaperExtensionServiceTest {
         final GameManager manager = new GameManager(new RoleAssigner(new Random(7)));
         final Plugin owner = owner("test");
         final Set<UUID> unavailable = new HashSet<>();
+        final Set<UUID> offline = new HashSet<>();
+        final com.caxture.manhuntuniversal.player.PendingPlayerState pending=new com.caxture.manhuntuniversal.player.PendingPlayerState();
         final List<Event> events = new ArrayList<>();
         Consumer<Event> listener = event -> {};
         boolean mainThread = true;
@@ -357,6 +410,11 @@ class PaperExtensionServiceTest {
             server = proxy(Server.class, (object, method, args) -> switch (method.getName()) {
                 case "isPrimaryThread" -> mainThread;
                 case "getPluginManager" -> plugins;
+                case "getPlayer" -> offline.contains(args[0]) ? null : proxy(org.bukkit.entity.Player.class, (player, operation, ignored) -> switch(operation.getName()) {
+                    case "isOnline" -> true;
+                    case "isDead" -> unavailable.contains(args[0]);
+                    default -> throw new UnsupportedOperationException(operation.getName());
+                });
                 default -> throw new UnsupportedOperationException(method.getName());
             });
             service = new PaperExtensionService(server, Logger.getLogger("extension-tests"), manager, this,
@@ -378,7 +436,7 @@ class PaperExtensionServiceTest {
             stopCalls++;
             return manager.cancel(session.id(), TerminationReason.ADMIN_STOPPED, NOW).isPresent();
         }
-        @Override public boolean available(UUID id) { return !unavailable.contains(id); }
+        @Override public boolean available(UUID id) { return com.caxture.manhuntuniversal.runtime.RoleChangeAvailability.available(server,pending,id); }
         @Override public void rolesChanged(GameSession session) {
             rolesSynced++;
             if (syncFailures-- > 0) throw new IllegalStateException("synchronization failed");
