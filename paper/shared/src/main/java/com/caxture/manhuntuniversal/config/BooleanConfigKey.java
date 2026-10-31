@@ -11,6 +11,7 @@ public enum BooleanConfigKey {
     RESET_PLAYERS_AT_START("reset-players-at-start", true),
     SHOW_CHAT_PREFIX("show-chat-prefix", true),
     ALLOW_BLAZE_SPAWNER_BREAK("allow-blaze-spawner-break", false),
+    PREVENT_NETHER_PORTAL_DESTRUCTION("prevent-nether-portal-destruction", false),
     ADJUST_PIGLIN_BARTERING("adjust-piglin-bartering", false),
     HUNTER_END_RESTRICTION_ENABLED("hunter-end-restriction-enabled", false);
 

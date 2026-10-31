@@ -28,27 +28,35 @@
 
 开关实时生效，关闭强制随机不会恢复旧选择。隐藏时 `status` 不显示双方名单，结算只显示胜方与原因。详见[角色配置说明](docs/role-options.md)。
 
-默认配置及服务端语言文件在 `plugins/ManhuntUniversal/`。原配置语义保持：`runner-count` 默认 1；两种指南针、聊天前缀和 `reset-players-at-start` 默认开启。开局重置会按旧实现清理参与者物品、状态、经验、进度并传送至出生点；可通过配置关闭。三个 `tracking-*` 参数在下一局生效。
+默认配置及服务端语言文件在 `plugins/ManhuntUniversal/`。原配置语义保持：`runner-count` 默认 1；两种指南针、聊天前缀和 `reset-players-at-start` 默认开启。开局重置会按旧实现清理参与者物品、状态、经验、进度并传送至出生点；可通过配置关闭。重定位距离、冷却及搜索半径在下一局生效。
+
+`tracking-distance-refresh-seconds` 控制指南针距离文本刷新，默认 `1.0` 秒，范围 `0.1`～`60.0`，实时生效。例如 `/mhu config tracking-distance-refresh-seconds 0.1`。按 20 TPS 向上取整到 tick；显示刷新与结构／传送门查询分离，调快显示不会提高大范围搜索频率。附近已生成结构会按实际结构部件校正目标，减少沿用远处旧目标的情况，详见[追踪性能与距离说明](docs/tracking-performance.md)。
+
+追踪下界要塞时，默认指向选定要塞内距离玩家最近的已确认烈焰人刷怪笼；未找到有效刷怪笼时沿用原有结构位置。候选来自结构元数据并检查实际方块，不扫描整座要塞，也不会为寻找刷怪笼生成地形。
 
 `runner-structure-tracker-unlock-time` 统一配置村庄、堡垒遗迹和下界堡垒的追踪解锁秒数，默认均为 `0`；`-1` 禁用对应结构，全禁用时不发速通者结构指南针。计时从正式开局开始，配置即时生效。例如 `/mhu config runner-structure-tracker-unlock-time.village 120`。禁用项隐藏，待解锁项显示倒计时并禁止选择，详见[结构追踪解锁说明](docs/structure-tracker-unlock.md)。
 
 `allow-blaze-spawner-break` 默认为 `false`，只在正式游戏 RUNNING 时禁止破坏普通烈焰人刷怪笼，包含 OP 和局外玩家。空闲、倒计时及结算后允许破坏；其他种类刷怪笼不受此规则影响。通过 `/mhu config allow-blaze-spawner-break true` 或点击配置项可即时允许破坏。
 
-三项可选优化默认关闭，可通过配置列表交互或以下命令开启，仅在正式游戏期间生效：
+`prevent-nether-portal-destruction` 默认为 `false`，开启后仅在正式游戏期间保护下界传送门的门体和必要门框，包含创造模式与 OP。通过 `/mhu config prevent-nether-portal-destruction true` 或点击配置项开启；详见[下界传送门保护说明](docs/nether-portal-protection.md)。
+
+可选优化默认关闭，可通过配置列表交互或以下命令开启，仅在正式游戏期间生效：
 
 | 配置项 | 默认值 | 作用 |
 | --- | --- | --- |
 | `ore-fortune-level` | `0` | 矿物虚拟时运等级，整数 0–10；0 关闭，取配置与工具已有时运的较高值，精准采集保持原样。 |
+| `blaze-rod-looting-level` | `0` | 烈焰棒虚拟抢夺等级，整数 0–5；0 关闭，取配置与玩家已有抢夺的较高值，不修改武器。 |
 | `adjust-piglin-bartering` | `false` | 调整为平均每 64 金锭产出约 16 珍珠、10 黑曜石、3 瓶抗火（普通与喷溅合计）；每次仍一种结果。 |
 | `hunter-end-restriction-enabled` | `false` | 任一存活速通者进入末地之前，禁止本局猎人放置末影之眼或进入末地；解锁持续到本局结束。 |
 
 ```text
 /mhu config ore-fortune-level 3
+/mhu config blaze-rod-looting-level 3
 /mhu config adjust-piglin-bartering true
 /mhu config hunter-end-restriction-enabled true
 ```
 
-时运和交易优化对正式游戏期间的所有玩家生效，空闲和倒计时不生效。详见[优化配置与概率说明](docs/optional-optimizations.md)。
+时运、烈焰棒和交易优化对正式游戏期间的所有玩家生效，空闲和倒计时不生效。详见[优化配置与概率说明](docs/optional-optimizations.md)。
 
 ## 版本矩阵
 
@@ -110,12 +118,12 @@ docs/                   使用说明、设计与验证记录
 
 构建后在各版本模块的 `build/libs/` 中取得部署 JAR。
 
-| 模块 | 部署产物（当前版本 0.1.0-SNAPSHOT） |
+| 模块 | 部署产物（当前版本 0.2.0） |
 | --- | --- |
-| Paper 1.21.11 | `paper/1.21.11/build/libs/manhunt-universal-paper-mc1.21.11-0.1.0-SNAPSHOT.jar` |
-| Paper 26.3 | `paper/26.3/build/libs/manhunt-universal-paper-mc26.3-0.1.0-SNAPSHOT.jar` |
-| Fabric 1.21.11 | `fabric/1.21.11/build/libs/manhunt-universal-fabric-mc1.21.11-0.1.0-SNAPSHOT.jar` |
-| Fabric 26.3 | `fabric/26.3/build/libs/manhunt-universal-fabric-mc26.3-0.1.0-SNAPSHOT.jar` |
+| Paper 1.21.11 | `paper/1.21.11/build/libs/manhunt-universal-paper-mc1.21.11-0.2.0.jar` |
+| Paper 26.3 | `paper/26.3/build/libs/manhunt-universal-paper-mc26.3-0.2.0.jar` |
+| Fabric 1.21.11 | `fabric/1.21.11/build/libs/manhunt-universal-fabric-mc1.21.11-0.2.0.jar` |
+| Fabric 26.3 | `fabric/26.3/build/libs/manhunt-universal-fabric-mc26.3-0.2.0.jar` |
 
 Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版本客户端的 `mods/`，并安装 Fabric Loader 和对应版本 Fabric API。不要安装 `-sources.jar` 或 `-dev.jar`，也不需要单独安装 `common`、`protocol` JAR。
 
@@ -127,6 +135,7 @@ Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版
 
 - [选队、配置交互和外部语言文件维护](docs/lobby-config.md)
 - [速通者淘汰、身份颜色和刷怪笼保护](docs/elimination-and-colors.md)
+- [下界传送门保护](docs/nether-portal-protection.md)
 - [矿物时运、猪灵交易和末地限制](docs/optional-optimizations.md)
 - [强制随机和隐藏角色分配](docs/role-options.md)
 - [扩展插件 API、SDK 与轮换插件示例](docs/extension-api.md)

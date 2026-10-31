@@ -8,13 +8,16 @@ import java.util.function.Consumer;
 public final class ConfigurationValues {
     private final EnumMap<IntConfigKey, Integer> integers;
     private final EnumMap<BooleanConfigKey, Boolean> booleans;
+    private final EnumMap<DecimalConfigKey, Double> decimals;
 
     private ConfigurationValues(
             Map<IntConfigKey, Integer> integers,
-            Map<BooleanConfigKey, Boolean> booleans
+            Map<BooleanConfigKey, Boolean> booleans,
+            Map<DecimalConfigKey, Double> decimals
     ) {
         this.integers = new EnumMap<>(integers);
         this.booleans = new EnumMap<>(booleans);
+        this.decimals = new EnumMap<>(decimals);
     }
 
     public static ConfigurationValues defaults() {
@@ -26,7 +29,11 @@ public final class ConfigurationValues {
         for (BooleanConfigKey key : BooleanConfigKey.values()) {
             booleans.put(key, key.defaultValue());
         }
-        return new ConfigurationValues(integers, booleans);
+        EnumMap<DecimalConfigKey, Double> decimals = new EnumMap<>(DecimalConfigKey.class);
+        for (DecimalConfigKey key : DecimalConfigKey.values()) {
+            decimals.put(key, key.defaultValue());
+        }
+        return new ConfigurationValues(integers, booleans, decimals);
     }
 
     public static ConfigurationValues fromRaw(Map<String, Object> raw, Consumer<String> warning) {
@@ -35,6 +42,7 @@ public final class ConfigurationValues {
         ConfigurationValues defaults = defaults();
         EnumMap<IntConfigKey, Integer> integers = new EnumMap<>(IntConfigKey.class);
         EnumMap<BooleanConfigKey, Boolean> booleans = new EnumMap<>(BooleanConfigKey.class);
+        EnumMap<DecimalConfigKey, Double> decimals = new EnumMap<>(DecimalConfigKey.class);
 
         for (IntConfigKey key : IntConfigKey.values()) {
             Object candidate = raw.get(key.configKey());
@@ -57,7 +65,16 @@ public final class ConfigurationValues {
                 warning.accept(key.configKey());
             }
         }
-        return new ConfigurationValues(integers, booleans);
+        for (DecimalConfigKey key : DecimalConfigKey.values()) {
+            Object candidate = raw.get(key.configKey());
+            if (candidate instanceof Number value && key.valid(value.doubleValue())) {
+                decimals.put(key, value.doubleValue());
+            } else {
+                decimals.put(key, defaults.get(key));
+                warning.accept(key.configKey());
+            }
+        }
+        return new ConfigurationValues(integers, booleans, decimals);
     }
 
     private static boolean isIntegerNumber(Object candidate) {
@@ -75,6 +92,10 @@ public final class ConfigurationValues {
         return booleans.get(Objects.requireNonNull(key, "key"));
     }
 
+    public double get(DecimalConfigKey key) {
+        return decimals.get(Objects.requireNonNull(key, "key"));
+    }
+
     public ConfigurationValues with(IntConfigKey key, int value) {
         Objects.requireNonNull(key, "key");
         if (!key.valid(value)) {
@@ -82,14 +103,24 @@ public final class ConfigurationValues {
         }
         EnumMap<IntConfigKey, Integer> updated = new EnumMap<>(integers);
         updated.put(key, value);
-        return new ConfigurationValues(updated, booleans);
+        return new ConfigurationValues(updated, booleans, decimals);
     }
 
     public ConfigurationValues with(BooleanConfigKey key, boolean value) {
         Objects.requireNonNull(key, "key");
         EnumMap<BooleanConfigKey, Boolean> updated = new EnumMap<>(booleans);
         updated.put(key, value);
-        return new ConfigurationValues(integers, updated);
+        return new ConfigurationValues(integers, updated, decimals);
+    }
+
+    public ConfigurationValues with(DecimalConfigKey key, double value) {
+        Objects.requireNonNull(key, "key");
+        if (!key.valid(value)) {
+            throw new IllegalArgumentException("Value outside range for " + key.configKey());
+        }
+        EnumMap<DecimalConfigKey, Double> updated = new EnumMap<>(decimals);
+        updated.put(key, value);
+        return new ConfigurationValues(integers, booleans, updated);
     }
 
     public TrackingSettings trackingSettings() {

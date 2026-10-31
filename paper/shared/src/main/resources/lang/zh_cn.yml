@@ -47,13 +47,14 @@ game:
     killer-section: "§6 击杀者：§f{player}"
 config:
   map-start: "§7- §e{key}§7 = {"
-  structure-unlock-usage: "{prefix}§e用法：/mhu config runner-structure-tracker-unlock-time.<village|bastion_remnant|nether_fortress> <秒数，-1 禁用>"
+  structure-unlock-usage: "{prefix}§e用法：/mhu config runner-structure-tracker-unlock-time.<结构名称> <秒数 | 填写 -1 代表禁用>"
   header: "{prefix}§f配置项："
   entry: "§7- §e{key}§7 ： §f{value}"
   unknown: "{prefix}§c未知配置项：{key}"
   invalid: "{prefix}§c配置值无效：{reason}"
   reason:
     not-integer: "必须是整数"
+    not-decimal: "必须是有限小数"
     invalid-boolean: "必须是 true 或 false"
     out-of-range: "必须在 {min} 到 {max} 之间"
   saved: "{prefix}§a已将 {key} 设置为 {value}。"
@@ -69,9 +70,11 @@ config:
     hide-role-assignments: "隐藏角色分配"
     ore-fortune-level: "矿物爆率提高等级 (0~5)"
     adjust-piglin-bartering: "猪灵交易爆率提高"
-    hunter-end-restriction-enabled: "速通者先进入末地"
+    blaze-rod-looting-level: "烈焰棒爆率提高等级 (0~5)"
+    hunter-end-restriction-enabled: "速通者进入末地前 禁止猎人与末地传送门交互"
     runner-count: "速通者人数"
     allow-blaze-spawner-break: "允许破坏烈焰人刷怪笼"
+    prevent-nether-portal-destruction: "禁止在下界破坏传送门"
     runner-compass-enabled: "速通者指南针"
     hunter-compass-enabled: "猎人指南针"
     reset-players-at-start: "开局重置玩家"
@@ -79,6 +82,7 @@ config:
     tracking-retarget-distance-blocks: "重新定位移动距离"
     tracking-retarget-cooldown-seconds: "重新定位冷却时间"
     tracking-search-radius-blocks: "结构搜索半径"
+    tracking-distance-refresh-seconds: "指南针距离刷新时间（秒）"
 team:
   disabled: "{prefix}§c已开启强制随机分配，不能选择队伍。"
   selected-hidden: "{prefix}§a已记录你的选择。"
@@ -99,6 +103,7 @@ team:
   locked: "{prefix}§c游戏已经开始，当前不能更改选队。"
   capacity-cleared: "{prefix}§e速通者人数配置减少，你的队伍选择将恢复为随机。"
 restriction:
+  nether-portal-destruction-denied: "{prefix}§c不能在下界破坏传送门。"
   hunter-end-locked: "{prefix}§c速通者尚未进入末地，猎人暂时不能放置末影之眼或进入末地。"
   blaze-spawner-break-denied: "{prefix}§c不能破坏烈焰人刷怪笼。"
 reason:
@@ -133,7 +138,7 @@ tracking:
     lore-runner-use: "§7手持查看目标；右键选择追踪目标。"
     lore-hunter-use: "§7手持时追踪最近的速通者。"
     lore-bound: "§c对局物品：不可丢弃或放入容器"
-    no-space: "{prefix}§c请腾出一个背包格以接收追踪指南针。"
+    no-space: "{prefix}§c请腾出一格背包空间以接收追踪指南针。"
   dialog:
     locked-tooltip: "§7将在 {time} 后解锁，当前不可选择"
     title: "§6选择追踪目标"
@@ -142,7 +147,7 @@ tracking:
     tooltip: "§7再次选择当前目标可停止追踪"
   selection:
     unlocked: "{prefix}§a已解锁追踪目标：[§e{target}§a]"
-    changed: "{prefix}§a追踪目标已切换为：{target}。"
+    changed: "{prefix}§a已切换追踪目标：{target}。"
     cleared: "{prefix}§e已停止追踪。"
   actionbar:
     same-dimension: "§f{target} §7| 距离：§e{distance}{unit} §7| {dimension}"

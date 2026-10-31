@@ -1,6 +1,7 @@
 package com.caxture.manhuntuniversal.tracking;
 
 import com.caxture.manhuntuniversal.config.BooleanConfigKey;
+import com.caxture.manhuntuniversal.config.DecimalConfigKey;
 import com.caxture.manhuntuniversal.config.ConfigurationService;
 import com.caxture.manhuntuniversal.game.GameManager;
 import com.caxture.manhuntuniversal.game.GameSession;
@@ -62,6 +63,9 @@ public final class CompassTrackingService {
     private final SharedSearchCache<StructureSearchKey, PortalPoint> sharedStructures = new SharedSearchCache<>(
             512, 300_000_000_000L, 15_000_000_000L, System::nanoTime, searchQueue::invalidate);
     private final PortalSearchEngine portalEngine;
+    private final StructureTargetIndex structureTargets = new StructureTargetIndex(512);
+    private final NearbyStructureProbe nearbyStructures;
+    private final TrackingTickSchedule tickSchedule = new TrackingTickSchedule();
     private final PortalInvalidationBuffer pendingPortalChanges = new PortalInvalidationBuffer();
     private long searchCycle;
     // Retained through finish/start for same-match role reassignment; holds no player/world objects.
@@ -72,12 +76,14 @@ public final class CompassTrackingService {
     private final Map<UUID, PortalSearchState> portalSearches = new HashMap<>();
     private final Map<UUID, TrackingTargetId> desiredTargets = new HashMap<>();
     private final Set<UUID> actionBarVisible = new HashSet<>();
+    private final Map<UUID, TrackingDisplay> lastDisplays = new HashMap<>();
     private final Set<UUID> noSlotWarned = new HashSet<>();
     private TrackingSessionState state;
     private TrackingSettingsSnapshot settings;
     private BukkitTask searchTicker;
     private long portalVersion;
-    private int searchTicks;
+    private double displayRefreshSeconds = Double.NaN;
+    private long displayRefreshTicks = 20;
 
     public CompassTrackingService(
             JavaPlugin plugin,
@@ -103,6 +109,9 @@ public final class CompassTrackingService {
         }, task -> server.getScheduler().runTaskAsynchronously(plugin, task), System::nanoTime,
                 exception -> plugin.getLogger().log(java.util.logging.Level.WARNING,
                         "Portal tracking query failed", exception));
+        this.nearbyStructures = new NearbyStructureProbe(new PaperStructureProbeSource(server), structureTargets,
+                System::nanoTime, exception -> plugin.getLogger().log(java.util.logging.Level.WARNING,
+                "Nearby structure metadata query failed", exception));
         // Keep existing bound-item identifiers independent of the plugin's display name.
         this.markerKey = new org.bukkit.NamespacedKey(ProtocolNamespace.NAMESPACE, "tracking_compass");
         this.sessionKey = new org.bukkit.NamespacedKey(ProtocolNamespace.NAMESPACE, "tracking_session");
@@ -137,9 +146,18 @@ public final class CompassTrackingService {
     }
 
     public void tick(GameSession session) {
+        maintain(session);
+        if (isTracking(session)) {
+            refreshDistanceDisplays(session);
+            tickSchedule.displayed();
+        }
+    }
+
+    private void maintain(GameSession session) {
         if (!isTracking(session)) {
             return;
         }
+        nearbyStructures.validateSpawners();
         for (var participant : session.participants()) {
             Player player = onlinePlayer(participant.id());
             if (player != null && !pendingPlayers.needsReset(participant.id())) {
@@ -202,6 +220,41 @@ public final class CompassTrackingService {
                         : staticDisplay(player, desired, now);
             }
             applyDirection(player, display.direction(), display.invalidDirectionWorld());
+        }
+    }
+
+    /** Display-only: no inventory repair, selection update, locate request, or portal/structure probe. */
+    private void refreshDistanceDisplays(GameSession session) {
+        refreshDistanceDisplays(session, false);
+    }
+
+    private void keepDistanceDisplaysAlive(GameSession session) {
+        refreshDistanceDisplays(session, true);
+    }
+
+    private void refreshDistanceDisplays(GameSession session, boolean keepAlive) {
+        if (!isTracking(session)) return;
+        for (var participant : session.participants()) {
+            Player player = onlinePlayer(participant.id());
+            if (player == null) continue;
+            TrackingCompassKind kind = expectedKind(session, participant.id()).orElse(null);
+            if (kind == null || pendingPlayers.needsReset(participant.id())
+                    || !isCurrentCompass(heldCompass(player), session.id(), kind)) {
+                clearActionBar(player);
+                continue;
+            }
+            TrackingDisplay display = keepAlive ? lastDisplays.get(participant.id()) : null;
+            if (display != null) {
+                showActionBarIfHeld(session, player, kind, display);
+                continue;
+            }
+            if (kind == TrackingCompassKind.HUNTER) display = hunterDisplay(session, player);
+            else {
+                TrackingTargetId selected = state.runnerSelection(participant.id());
+                display = selected == TrackingTargetId.NONE ? status("tracking.actionbar.runner-select-target")
+                        : staticDisplay(player, selected, Instant.now(clock), false);
+            }
+            lastDisplays.put(participant.id(), display);
             showActionBarIfHeld(session, player, kind, display);
         }
     }
@@ -497,6 +550,10 @@ public final class CompassTrackingService {
     }
 
     private TrackingDisplay staticDisplay(Player player, TrackingTargetId target, Instant now) {
+        return staticDisplay(player, target, now, true);
+    }
+
+    private TrackingDisplay staticDisplay(Player player, TrackingTargetId target, Instant now, boolean allowSearch) {
         World targetWorld = chooseTargetWorld(player, target.targetWorldKind().orElseThrow());
         if (targetWorld == null) {
             return new TrackingDisplay(
@@ -506,29 +563,44 @@ public final class CompassTrackingService {
                     null);
         }
         StaticSearchState search = staticSearches.get(player.getUniqueId());
-        Location movementReference = movementReference(player, targetWorld);
-        boolean movedEnough = search != null
-                && !search.searching()
-                && TrackingPolicy.shouldRetarget(
-                position(search.origin()), position(movementReference),
-                search.searchedAt(), now, settings);
-        boolean needsSearch = search == null
-                || search.target() != target
-                || !search.worldId().equals(targetWorld.getUID())
-                || movedEnough;
-        if (needsSearch) {
-            Location origin = movedEnough ? movementReference : searchOrigin(player, targetWorld);
-            enqueueStaticSearch(player, target, targetWorld, origin, now);
-            search = staticSearches.get(player.getUniqueId());
+        if (allowSearch) {
+            Location movementReference = movementReference(player, targetWorld);
+            boolean movedEnough = search != null
+                    && !search.searching()
+                    && TrackingPolicy.shouldRetarget(position(search.origin()), position(movementReference),
+                    search.searchedAt(), now, settings);
+            if (search == null || search.target() != target || !search.worldId().equals(targetWorld.getUID()) || movedEnough) {
+                Location origin = movedEnough ? movementReference : searchOrigin(player, targetWorld);
+                enqueueStaticSearch(player, target, targetWorld, origin, now);
+                search = staticSearches.get(player.getUniqueId());
+            }
+            if (player.getWorld().equals(targetWorld)) {
+                if (target == TrackingTargetId.NETHER_FORTRESS && search != null && search.result() != null) {
+                    nearbyStructures.requestTarget(new NearbyStructureProbe.Query(targetWorld.getUID(),
+                            new PortalSearchCursor.Chunk(search.result().getBlockX() >> 4,
+                                    search.result().getBlockZ() >> 4), target));
+                }
+                int x = player.getLocation().getBlockX() >> 4, z = player.getLocation().getBlockZ() >> 4;
+                for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
+                    nearbyStructures.request(new NearbyStructureProbe.Query(targetWorld.getUID(),
+                            new PortalSearchCursor.Chunk(x + dx, z + dz), target));
+                }
+            }
         }
-        if (search == null || (search.result() == null && search.searching())) {
+        Location result = search == null ? null : search.result();
+        if (player.getWorld().equals(targetWorld)) {
+            PortalPoint fallback = result == null ? null : point(result);
+            result = structureTargets.nearest(target, position(player.getLocation()), fallback, settings.searchRadiusBlocks())
+                    .map(this::location).orElse(null);
+        }
+        if (result == null && (search == null || search.searching())) {
             return new TrackingDisplay(
                     "tracking.actionbar.searching",
                     targetPlaceholders(player, target, targetWorld),
                     null,
                     targetWorld);
         }
-        if (search.result() == null) {
+        if (result == null) {
             return new TrackingDisplay(
                     "tracking.actionbar.not-found",
                     targetPlaceholders(player, target, targetWorld),
@@ -536,9 +608,9 @@ public final class CompassTrackingService {
                     targetWorld);
         }
         if (player.getWorld().equals(targetWorld)) {
-            return located(player, target, search.result(), targetWorld);
+            return located(player, target, result, targetWorld);
         }
-        PortalSearchState portal = ensurePortalSearch(player, now);
+        PortalSearchState portal = allowSearch ? ensurePortalSearch(player, now) : portalSearches.get(player.getUniqueId());
         if (portal != null && portal.result() != null) {
             return new TrackingDisplay(
                     "tracking.actionbar.cross-dimension",
@@ -663,6 +735,7 @@ public final class CompassTrackingService {
         if (state == null || !state.isCurrent(token)) {
             return;
         }
+        if (result != null) structureTargets.recordPoint(token.worldId(), token.target(), point(result));
         staticSearches.put(token.playerId(), new StaticSearchState(
                 token.target(), token.worldId(), origin, result, searchedAt, false, token));
     }
@@ -730,6 +803,7 @@ public final class CompassTrackingService {
     }
 
     private Location searchOrigin(Player player, World targetWorld) {
+        if (player.getWorld().equals(targetWorld)) return player.getLocation().clone();
         Optional<TrackingPosition> visited = state.lastPosition(
                 player.getUniqueId(), targetWorld.getUID());
         if (visited.isPresent()) {
@@ -958,6 +1032,7 @@ public final class CompassTrackingService {
     }
 
     private void clearActionBar(Player player) {
+        lastDisplays.remove(player.getUniqueId());
         if (actionBarVisible.remove(player.getUniqueId())) {
             player.sendActionBar(Component.empty());
         }
@@ -1075,6 +1150,7 @@ public final class CompassTrackingService {
         sharedStructures.invalidateMatching(key -> key.worldId().equals(worldId));
         portalEngine.invalidateWorld(worldId);
         pendingPortalChanges.removeWorld(worldId);
+        nearbyStructures.unload(worldId);
     }
 
     private void flushPortalChanges() {
@@ -1098,11 +1174,21 @@ public final class CompassTrackingService {
         flushPortalChanges();
         searchQueue.runOne();
         portalEngine.tick();
-        searchTicks++;
-        if (searchTicks >= 20) {
-            searchTicks = 0;
-            runningSession().ifPresent(this::tick);
+        nearbyStructures.tick();
+        var due = tickSchedule.advance(distanceRefreshTicks());
+        if (due.maintenance()) runningSession().ifPresent(this::maintain);
+        if (due.display()) runningSession().ifPresent(this::refreshDistanceDisplays);
+        else if (due.keepAlive()) runningSession().ifPresent(this::keepDistanceDisplaysAlive);
+    }
+
+    private long distanceRefreshTicks() {
+        var key = DecimalConfigKey.TRACKING_DISTANCE_REFRESH_SECONDS;
+        double current = configuration.get(key);
+        if (Double.compare(current, displayRefreshSeconds) != 0) {
+            displayRefreshSeconds = current;
+            displayRefreshTicks = key.refreshTicks(current);
         }
+        return displayRefreshTicks;
     }
 
     private boolean isTracking(GameSession session) {
@@ -1126,6 +1212,8 @@ public final class CompassTrackingService {
     private void clearRuntimeState() {
         sharedStructures.clear();
         portalEngine.clear();
+        nearbyStructures.clear();
+        tickSchedule.clear();
         pendingPortalChanges.clear();
         searchCycle = 0;
         searchQueue.clear();
@@ -1134,9 +1222,10 @@ public final class CompassTrackingService {
         desiredTargets.clear();
         selectionAuthorizations.clear();
         actionBarVisible.clear();
+        lastDisplays.clear();
         noSlotWarned.clear();
         portalVersion = 0;
-        searchTicks = 0;
+        displayRefreshSeconds = Double.NaN;
     }
 
     private void recordPosition(UUID playerId, Location location) {

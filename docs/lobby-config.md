@@ -26,6 +26,8 @@
 
 插件不会改写已有的 `plugins/ManhuntUniversal/lang/zh_cn.yml`、`en_us.yml`。内置文件为新默认值；外部文件仍按原规则优先覆盖，缺少的新键会回退到内置语言。
 
+不带参数的 `/mhu` 用法提示来自 `command.usage`，在 YAML 中是 `command:` 下的 `usage:`，不在 `config.yml`。旧外部提示若仍包含 `/rmh`，占位符相同也不再覆盖新版用法，而是回退内置 `/mhu` 帮助；不会修改外部文件。该兼容检查仅用于指定用法模板，当前 `/mhu` 自定义文本继续优先。新距离刷新项的本地化键为 `config.name.tracking-distance-refresh-seconds`，非法小数提示为 `config.reason.not-decimal`。
+
 请按需要从 JAR 或仓库中对应语言文件更新以下条目：
 
 - `prefix`：中文为 `§8[§c穹猎追杀§8] §r`，英文为 `§8[§cManhunt Universal§8] §r`。

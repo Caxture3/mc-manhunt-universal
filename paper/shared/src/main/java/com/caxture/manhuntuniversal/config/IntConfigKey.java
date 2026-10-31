@@ -6,6 +6,7 @@ import java.util.Optional;
 public enum IntConfigKey {
     RUNNER_COUNT("runner-count", 1, 1, 100),
     ORE_FORTUNE_LEVEL("ore-fortune-level", 0, 0, 10),
+    BLAZE_ROD_LOOTING_LEVEL("blaze-rod-looting-level", 0, 0, 5),
     RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_VILLAGE("runner-structure-tracker-unlock-time.village", 0, -1, Integer.MAX_VALUE),
     RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_BASTION_REMNANT("runner-structure-tracker-unlock-time.bastion_remnant", 0, -1, Integer.MAX_VALUE),
     RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_NETHER_FORTRESS("runner-structure-tracker-unlock-time.nether_fortress", 0, -1, Integer.MAX_VALUE),

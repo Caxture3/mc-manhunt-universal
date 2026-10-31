@@ -1,8 +1,12 @@
 package com.caxture.manhuntuniversal.command;
 
 import com.caxture.manhuntuniversal.config.IntConfigKey;
+import com.caxture.manhuntuniversal.config.DecimalConfigKey;
+
+import java.util.regex.Pattern;
 
 public final class CommandArguments {
+    private static final Pattern DECIMAL = Pattern.compile("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?");
     private CommandArguments() {
     }
 
@@ -32,6 +36,25 @@ public final class CommandArguments {
         throw new InvalidArgument(Error.INVALID_BOOLEAN);
     }
 
+    public static double decimal(DecimalConfigKey key, String raw) {
+        if (raw == null || !DECIMAL.matcher(raw).matches()) {
+            throw new InvalidArgument(Error.NOT_DECIMAL);
+        }
+        double value;
+        try {
+            value = Double.parseDouble(raw);
+        } catch (NumberFormatException exception) {
+            throw new InvalidArgument(Error.NOT_DECIMAL);
+        }
+        if (!Double.isFinite(value)) {
+            throw new InvalidArgument(Error.NOT_DECIMAL);
+        }
+        if (!key.valid(value)) {
+            throw new InvalidArgument(Error.OUT_OF_RANGE);
+        }
+        return value;
+    }
+
     private static int parseInteger(String raw) {
         try {
             return Integer.parseInt(raw);
@@ -42,6 +65,7 @@ public final class CommandArguments {
 
     public enum Error {
         NOT_INTEGER,
+        NOT_DECIMAL,
         OUT_OF_RANGE,
         INVALID_BOOLEAN
     }

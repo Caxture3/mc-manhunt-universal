@@ -61,6 +61,10 @@ public final class ConfigurationService {
         return values.get(key);
     }
 
+    public synchronized double get(DecimalConfigKey key) {
+        return values.get(key);
+    }
+
     public synchronized boolean showChatPrefix() {
         return get(BooleanConfigKey.SHOW_CHAT_PREFIX);
     }
@@ -104,6 +108,18 @@ public final class ConfigurationService {
         booleanChanged = Objects.requireNonNull(listener);
     }
 
+    public synchronized boolean update(DecimalConfigKey key, double value) {
+        ConfigurationValues updated = values.with(key, value);
+        Object previousRaw = yaml.get(key.configKey());
+        yaml.set(key.configKey(), value);
+        if (!save()) {
+            yaml.set(key.configKey(), previousRaw);
+            return false;
+        }
+        values = updated;
+        return true;
+    }
+
     public synchronized void onStructureUnlockTimesChanged(Runnable listener) {
         structureUnlockTimesChanged = Objects.requireNonNull(listener);
     }
@@ -114,6 +130,9 @@ public final class ConfigurationService {
             raw.put(key.configKey(), yaml.get(key.configKey()));
         }
         for (BooleanConfigKey key : BooleanConfigKey.values()) {
+            raw.put(key.configKey(), yaml.get(key.configKey()));
+        }
+        for (DecimalConfigKey key : DecimalConfigKey.values()) {
             raw.put(key.configKey(), yaml.get(key.configKey()));
         }
         Set<String> warned = new HashSet<>();
@@ -134,6 +153,12 @@ public final class ConfigurationService {
             }
         }
         for (BooleanConfigKey key : BooleanConfigKey.values()) {
+            if (!yaml.contains(key.configKey())) {
+                yaml.set(key.configKey(), key.defaultValue());
+                changed = true;
+            }
+        }
+        for (DecimalConfigKey key : DecimalConfigKey.values()) {
             if (!yaml.contains(key.configKey())) {
                 yaml.set(key.configKey(), key.defaultValue());
                 changed = true;

@@ -54,6 +54,7 @@ config:
   invalid: "{prefix}§cInvalid configuration value: {reason}"
   reason:
     not-integer: "it must be an integer"
+    not-decimal: "it must be a finite decimal number"
     invalid-boolean: "it must be true or false"
     out-of-range: "it must be between {min} and {max}"
   saved: "{prefix}§aSet {key} to {value}."
@@ -69,9 +70,11 @@ config:
     hide-role-assignments: "Hide role assignments"
     ore-fortune-level: "Virtual ore Fortune level"
     adjust-piglin-bartering: "Adjusted piglin bartering"
+    blaze-rod-looting-level: "Blaze rod Looting level (0–5)"
     hunter-end-restriction-enabled: "Require runner End entry before hunters"
     runner-count: "Speedrunner count"
     allow-blaze-spawner-break: "Allow breaking blaze spawners"
+    prevent-nether-portal-destruction: "Prevent portal destruction in the Nether"
     runner-compass-enabled: "Speedrunner compass"
     hunter-compass-enabled: "Hunter compass"
     reset-players-at-start: "Reset players at start"
@@ -79,6 +82,7 @@ config:
     tracking-retarget-distance-blocks: "Retarget distance"
     tracking-retarget-cooldown-seconds: "Retarget cooldown"
     tracking-search-radius-blocks: "Structure search radius"
+    tracking-distance-refresh-seconds: "Compass distance refresh time (seconds)"
 team:
   disabled: "{prefix}§cRole assignment is forced random; team selection is disabled."
   selected-hidden: "{prefix}§aYour choice has been recorded."
@@ -99,6 +103,7 @@ team:
   locked: "{prefix}§cThe game has started; team choices are locked."
   capacity-cleared: "{prefix}§eThe speedrunner limit was reduced, your choice is now random."
 restriction:
+  nether-portal-destruction-denied: "{prefix}§cNether portals and their required frames cannot be destroyed in the Nether."
   hunter-end-locked: "{prefix}§cA living speedrunner must enter the End before hunters can insert Eyes of Ender or enter the End."
   blaze-spawner-break-denied: "{prefix}§cBlaze spawners cannot be broken."
 reason:

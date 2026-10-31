@@ -10,9 +10,11 @@ import com.caxture.manhuntuniversal.game.RoleAssigner;
 import com.caxture.manhuntuniversal.game.TeamPreference;
 import com.caxture.manhuntuniversal.i18n.LanguageService;
 import com.caxture.manhuntuniversal.listener.BlazeSpawnerProtectionListener;
+import com.caxture.manhuntuniversal.listener.NetherPortalProtectionListener;
 import com.caxture.manhuntuniversal.listener.GameEventListener;
 import com.caxture.manhuntuniversal.optimization.HunterEndAccessListener;
 import com.caxture.manhuntuniversal.optimization.OreFortuneListener;
+import com.caxture.manhuntuniversal.optimization.BlazeRodLootingListener;
 import com.caxture.manhuntuniversal.optimization.PiglinBarterListener;
 import com.caxture.manhuntuniversal.extension.PaperExtensionService;
 import com.caxture.manhuntuniversal.api.ManhuntUniversalApi;
@@ -121,7 +123,10 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(clientPublisher, this);
         getServer().getPluginManager().registerEvents(
                 new BlazeSpawnerProtectionListener(language, gameManager, configuration), this);
+        getServer().getPluginManager().registerEvents(
+                new NetherPortalProtectionListener(gameManager, configuration, language), this);
         getServer().getPluginManager().registerEvents(new OreFortuneListener(this, gameManager, configuration), this);
+        getServer().getPluginManager().registerEvents(new BlazeRodLootingListener(gameManager, configuration), this);
         getServer().getPluginManager().registerEvents(new PiglinBarterListener(gameManager, configuration), this);
         getServer().getPluginManager().registerEvents(new HunterEndAccessListener(gameManager, configuration, language), this);
     }

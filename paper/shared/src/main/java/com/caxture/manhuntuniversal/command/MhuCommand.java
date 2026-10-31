@@ -2,6 +2,7 @@ package com.caxture.manhuntuniversal.command;
 
 import com.caxture.manhuntuniversal.config.BooleanConfigKey;
 import com.caxture.manhuntuniversal.config.ConfigurationService;
+import com.caxture.manhuntuniversal.config.DecimalConfigKey;
 import com.caxture.manhuntuniversal.config.IntConfigKey;
 import com.caxture.manhuntuniversal.config.RunnerStructureUnlockTimes;
 import com.caxture.manhuntuniversal.game.GameManager;
@@ -184,6 +185,9 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             for (BooleanConfigKey key : BooleanConfigKey.values()) {
                 sendConfigEntry(sender, key.configKey(), Boolean.toString(configuration.get(key)));
             }
+            for (DecimalConfigKey key : DecimalConfigKey.values()) {
+                sendConfigEntry(sender, key.configKey(), Double.toString(configuration.get(key)));
+            }
             sendStructureUnlockGroup(sender);
             return;
         }
@@ -195,13 +199,15 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         }
         IntConfigKey integerKey = IntConfigKey.find(requested).orElse(null);
         BooleanConfigKey booleanKey = BooleanConfigKey.find(requested).orElse(null);
-        if (integerKey == null && booleanKey == null) {
+        DecimalConfigKey decimalKey = DecimalConfigKey.find(requested).orElse(null);
+        if (integerKey == null && booleanKey == null && decimalKey == null) {
             language.send(sender, "config.unknown", Map.of("key", args[1]));
             return;
         }
         if (args.length == 2) {
             sendConfigEntry(sender, requested, integerKey != null
                     ? Integer.toString(configuration.get(integerKey))
+                    : decimalKey != null ? Double.toString(configuration.get(decimalKey))
                     : Boolean.toString(configuration.get(booleanKey)));
             return;
         }
@@ -209,11 +215,11 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             language.send(sender, "config.usage");
             return;
         }
-        saveConfig(sender, requested, integerKey, booleanKey, args[2]);
+        saveConfig(sender, requested, integerKey, booleanKey, decimalKey, args[2]);
     }
 
     private boolean saveConfig(CommandSender sender, String requested, IntConfigKey integerKey,
-                               BooleanConfigKey booleanKey, String raw) {
+                               BooleanConfigKey booleanKey, DecimalConfigKey decimalKey, String raw) {
         if (activeGame.extensionHooks().mutationActive()) {
             language.send(sender, "command.busy");
             return false;
@@ -225,6 +231,10 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
                 int parsed = CommandArguments.integer(integerKey, raw);
                 saved = configuration.update(integerKey, parsed);
                 value = Integer.toString(parsed);
+            } else if (decimalKey != null) {
+                double parsed = CommandArguments.decimal(decimalKey, raw);
+                saved = configuration.update(decimalKey, parsed);
+                value = Double.toString(parsed);
             } else {
                 boolean parsed = CommandArguments.bool(raw);
                 saved = configuration.update(booleanKey, parsed);
@@ -239,7 +249,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             return saved;
         } catch (CommandArguments.InvalidArgument exception) {
             language.send(sender, "config.invalid", Map.of(
-                    "reason", argumentError(sender, exception.error(), integerKey)));
+                    "reason", argumentError(sender, exception.error(), integerKey, decimalKey)));
         }
         return false;
     }
@@ -247,14 +257,16 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
     private String argumentError(
             CommandSender sender,
             CommandArguments.Error error,
-            IntConfigKey integerKey
+            IntConfigKey integerKey,
+            DecimalConfigKey decimalKey
     ) {
         return switch (error) {
             case NOT_INTEGER -> language.text(sender, "config.reason.not-integer");
+            case NOT_DECIMAL -> language.text(sender, "config.reason.not-decimal");
             case INVALID_BOOLEAN -> language.text(sender, "config.reason.invalid-boolean");
             case OUT_OF_RANGE -> language.text(sender, "config.reason.out-of-range", Map.of(
-                    "min", Integer.toString(integerKey.minimum()),
-                    "max", Integer.toString(integerKey.maximum())));
+                    "min", decimalKey != null ? Double.toString(decimalKey.minimum()) : Integer.toString(integerKey.minimum()),
+                    "max", decimalKey != null ? Double.toString(decimalKey.maximum()) : Integer.toString(integerKey.maximum())));
         };
     }
 
@@ -272,7 +284,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
                         ConfigToggleAction.Result result = ConfigToggleAction.toggle(
                                 () -> player.hasPermission(ADMIN_PERMISSION),
                                 () -> configuration.get(booleanKey),
-                                next -> saveConfig(player, key, null, booleanKey, Boolean.toString(next)));
+                                next -> saveConfig(player, key, null, booleanKey, null, Boolean.toString(next)));
                         if (result == ConfigToggleAction.Result.DENIED) {
                             language.send(player, "command.no-permission");
                         } else if (result == ConfigToggleAction.Result.CHANGED) {
@@ -319,9 +331,13 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             candidates.add(RunnerStructureUnlockTimes.CONFIG_KEY);
             Arrays.stream(IntConfigKey.values()).map(IntConfigKey::configKey).forEach(candidates::add);
             Arrays.stream(BooleanConfigKey.values()).map(BooleanConfigKey::configKey).forEach(candidates::add);
+            Arrays.stream(DecimalConfigKey.values()).map(DecimalConfigKey::configKey).forEach(candidates::add);
         } else if (args.length == 3 && args[0].equalsIgnoreCase("config")
                 && BooleanConfigKey.find(args[1].toLowerCase(Locale.ROOT)).isPresent()) {
             candidates.addAll(List.of("true", "false"));
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("config")
+                && DecimalConfigKey.find(args[1].toLowerCase(Locale.ROOT)).isPresent()) {
+            candidates.addAll(List.of("0.1", "0.5", "1.0", "2.0", "5.0"));
         } else if (args.length == 3 && args[0].equalsIgnoreCase("config")
                 && IntConfigKey.find(args[1].toLowerCase(Locale.ROOT)).filter(IntConfigKey::structureUnlockTime).isPresent()) {
             candidates.addAll(List.of("-1", "0", "120", "900", "1200"));
