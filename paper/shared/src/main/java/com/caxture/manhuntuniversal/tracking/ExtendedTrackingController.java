@@ -13,7 +13,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.time.*;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 /** Adapts public string-ID tracking to the existing native compass/search implementation. */
@@ -50,15 +49,9 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
         menus = new DynamicTrackingSelectionPresenter(clients, language, player -> tracking.extensionMaySelect(player, true),
                 (player, sessionId, authorization, revision, target) -> match.get().filter(value -> value.id().equals(sessionId)).isPresent()
                         && registry.choose(player.getUniqueId(), target, revision));
-        for (var target : List.of(TrackingTargetId.VILLAGE, TrackingTargetId.NETHER_FORTRESS, TrackingTargetId.BASTION_REMNANT)) {
-            String id = id(target);
-            TrackingAppearance.Theme theme = switch (target) { case VILLAGE -> TrackingAppearance.Theme.VILLAGE;
-                case NETHER_FORTRESS -> TrackingAppearance.Theme.FORTRESS; default -> TrackingAppearance.Theme.BASTION; };
-            registry.registerCore(new TrackingTargetDefinition(id, menuText(language.localized(target.languageKey())),
-                    LocalizedText.of(target.name().replace('_', ' ')), LocalizedText.of(""), target.ordinal(),
-                    target == TrackingTargetId.VILLAGE ? TrackingWorld.overworld() : TrackingWorld.nether(),
-                    new TrackingAppearance(theme, 0xff303840, Optional.empty(), Optional.empty()),
-                    viewer -> coreAvailability(target, viewer), (request, cancellation) -> CompletableFuture.completedFuture(LocateResult.core()), true, Optional.empty()));
+        for (var target : CoreTrackingTargets.ids()) {
+            registry.registerCore(CoreTrackingTargets.definition(target,menuText(language.localized(target.languageKey())),
+                    viewer -> coreAvailability(target,viewer)));
         }
         registry.onChange(this::changed);
         registry.labels((viewer,target,field,fallback)->{
@@ -67,7 +60,7 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
             return language.localizedValue(receiver,key,fallback);
         });
     }
-    static String id(TrackingTargetId target) { return "core:" + target.name().toLowerCase(Locale.ROOT); }
+    static String id(TrackingTargetId target) { return CoreTrackingTargets.id(target); }
     static TrackingTargetId nativeTarget(String target) {
         if (target == null || !target.startsWith("core:")) return TrackingTargetId.NONE;
         try { return TrackingTargetId.valueOf(target.substring(5).toUpperCase(Locale.ROOT)); } catch (IllegalArgumentException ignored) { return TrackingTargetId.NONE; }
@@ -213,16 +206,7 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
         plugin.getServer().getPluginManager().callEvent(event);
     }
     private TargetAvailability coreAvailability(TrackingTargetId target, TrackingViewerContext viewer) {
-        if (!configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED)) return TargetAvailability.hidden();
-        int seconds = switch (target) {
-            case VILLAGE -> configuration.get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_VILLAGE);
-            case NETHER_FORTRESS -> configuration.get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_NETHER_FORTRESS);
-            default -> configuration.get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_BASTION_REMNANT);
-        };
-        if (seconds < 0) return TargetAvailability.hidden();
-        Instant started = viewer.match().flatMap(MatchSnapshot::startedAt).orElse(viewer.now());
-        long remaining = Math.max(0, seconds * 1000L - Math.max(0, Duration.between(started, viewer.now()).toMillis()));
-        return remaining == 0 ? TargetAvailability.available() : TargetAvailability.locked(remaining, "");
+        return CoreTrackingTargets.availability(target,configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED),configuration::get,viewer);
     }
     static WorldPosition point(Location location) { return new WorldPosition(location.getWorld().getUID(), location.getX(), location.getY(), location.getZ()); }
     private static LocalizedText menuText(LocalizedText text){

@@ -7,6 +7,16 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StructureUnlockPolicyTest {
+    @Test void trialDefaultsToDisabledAndUsesTheSameFormalStartAndExactUnlockBoundary() {
+        var defaults=new RunnerStructureUnlockTimes(0,0,0);assertEquals(-1,defaults.trialChambers());
+        assertEquals(-1,StructureUnlockPolicy.remainingMillis(TrackingTargetId.TRIAL_CHAMBERS,defaults,START,START));
+        var times=new RunnerStructureUnlockTimes(-1,-1,-1,120);assertTrue(times.anyEnabled());
+        assertEquals(1,StructureUnlockPolicy.remainingMillis(TrackingTargetId.TRIAL_CHAMBERS,times,START,START.plusMillis(119999)));
+        assertEquals(0,StructureUnlockPolicy.remainingMillis(TrackingTargetId.TRIAL_CHAMBERS,times,START,START.plusSeconds(120)));
+        assertThrows(IllegalArgumentException.class,()->new RunnerStructureUnlockTimes(0,0,0,-2));
+        assertThrows(IllegalArgumentException.class,()->TrackingSelectionTargetMapper.toProtocol(TrackingTargetId.TRIAL_CHAMBERS));
+        assertFalse(StructureUnlockPolicy.allows(TrackingTargetId.TRIAL_CHAMBERS,com.caxture.manhuntuniversal.protocol.TrackingAvailability.allUnlocked()));
+    }
     private static final Instant START = Instant.parse("2026-10-31T00:00:00Z");
 
     @Test void disabledImmediateAndDelayedTargetsHaveIndependentStates() {

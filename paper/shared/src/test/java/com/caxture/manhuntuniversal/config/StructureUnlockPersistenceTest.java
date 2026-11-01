@@ -30,7 +30,8 @@ class StructureUnlockPersistenceTest {
         var saved = YamlConfiguration.loadConfiguration(file);
         var section = saved.getConfigurationSection("runner-structure-tracker-unlock-time");
         assertNotNull(section);
-        assertEquals(java.util.Set.of("village", "bastion_remnant", "nether_fortress"), section.getKeys(false));
+        assertEquals(java.util.Set.of("village", "bastion_remnant", "nether_fortress", "trial_chambers"), section.getKeys(false));
+        assertEquals(-1,section.getInt("trial_chambers"));
         assertEquals(success ? 120 : 0, section.getInt("village"));
         assertEquals(success ? 1 : 0, changes[0]);
         assertTrue(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_VILLAGE.valid(-1));

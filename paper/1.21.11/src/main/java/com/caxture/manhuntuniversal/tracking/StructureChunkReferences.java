@@ -50,7 +50,7 @@ final class StructureChunkReferences {
         }
     }
 
-    private static boolean matches(NamespacedKey key, TrackingTargetId target) {
+    static boolean matches(NamespacedKey key, TrackingTargetId target) {
         if (!NamespacedKey.MINECRAFT.equals(key.getNamespace())) {
             return false;
         }
@@ -61,6 +61,7 @@ final class StructureChunkReferences {
             };
             case NETHER_FORTRESS -> key.getKey().equals("fortress");
             case BASTION_REMNANT -> key.getKey().equals("bastion_remnant");
+            case TRIAL_CHAMBERS -> key.getKey().equals("trial_chambers");
             case NONE -> false;
         };
     }

@@ -134,6 +134,7 @@ public final class ConfigurationValues {
         return new RunnerStructureUnlockTimes(
                 get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_VILLAGE),
                 get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_BASTION_REMNANT),
-                get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_NETHER_FORTRESS));
+                get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_NETHER_FORTRESS),
+                get(IntConfigKey.RUNNER_STRUCTURE_TRACKER_UNLOCK_TIME_TRIAL_CHAMBERS));
     }
 }

@@ -79,6 +79,7 @@ final class PaperStructureProbeSource implements NearbyStructureProbe.Source {
                     Structure.VILLAGE_SNOWY, Structure.VILLAGE_TAIGA);
             case NETHER_FORTRESS -> List.of(Structure.FORTRESS);
             case BASTION_REMNANT -> List.of(Structure.BASTION_REMNANT);
+            case TRIAL_CHAMBERS -> List.of(Structure.TRIAL_CHAMBERS);
             case NONE -> List.of();
         };
     }

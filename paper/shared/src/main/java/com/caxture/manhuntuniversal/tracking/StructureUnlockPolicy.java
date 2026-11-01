@@ -16,8 +16,20 @@ public final class StructureUnlockPolicy {
     }
 
     public static boolean allows(TrackingTargetId target, TrackingAvailability availability) {
-        return target == TrackingTargetId.NONE || target != null && target.selectableByRunner()
+        return target == TrackingTargetId.NONE || target != null && target.selectableByRunner() && target.legacySelectorSupported()
                 && availability.unlocked(TrackingSelectionTargetMapper.toProtocol(target));
+    }
+
+    public static long remainingMillis(TrackingTargetId target,RunnerStructureUnlockTimes times,Instant startedAt,Instant now) {
+        int seconds=switch(target){
+            case VILLAGE->times.village();case NETHER_FORTRESS->times.netherFortress();
+            case BASTION_REMNANT->times.bastionRemnant();case TRIAL_CHAMBERS->times.trialChambers();case NONE->-1;
+        };
+        return remainingMillis(seconds,startedAt,now);
+    }
+    public static long remainingMillis(int seconds,Instant startedAt,Instant now) {
+        if(seconds < -1)throw new IllegalArgumentException("Unlock time must be -1 or nonnegative seconds");
+        return remaining(seconds,Math.max(0,Duration.between(startedAt,now).toMillis()));
     }
 
     private static long remaining(int seconds, long elapsed) {

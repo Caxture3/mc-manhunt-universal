@@ -81,7 +81,7 @@ final class DynamicTrackingSelectionPresenter {
         Dialog dialog = Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(languages.component(player, "tracking.dialog.title", Map.of())).canCloseWithEscape(true)
                         .afterAction(DialogBase.DialogAfterAction.NONE).pause(false).build())
-                .type(DialogType.multiAction(buttons, exit, Math.max(1, Math.min(3, buttons.size())))));
+                .type(DialogType.multiAction(buttons, exit, Math.max(1, Math.min(4, buttons.size())))));
         languages.showDialog(player, "core:tracking.menu", dialog);
     }
     private DialogAction callback(Player player, Window window, long rendered, Runnable action,boolean dismiss,long directory) {

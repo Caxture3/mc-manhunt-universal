@@ -34,7 +34,7 @@
 
 追踪下界要塞时，默认指向选定要塞内距离玩家最近的已确认烈焰人刷怪笼；未找到有效刷怪笼时沿用原有结构位置。候选来自结构元数据并检查实际方块，不扫描整座要塞，也不会为寻找刷怪笼生成地形。
 
-`runner-structure-tracker-unlock-time` 统一配置村庄、堡垒遗迹和下界堡垒的追踪解锁秒数，默认均为 `0`；`-1` 禁用对应结构，全禁用时不发速通者结构指南针。计时从正式开局开始，配置即时生效。例如 `/mhu config runner-structure-tracker-unlock-time.village 120`。禁用项隐藏，待解锁项显示倒计时并禁止选择，详见[结构追踪解锁说明](docs/structure-tracker-unlock.md)。
+`runner-structure-tracker-unlock-time` 统一配置村庄、堡垒遗迹、下界堡垒和试炼密室的追踪解锁秒数；前三项默认 `0`，`trial_chambers` 默认 `-1`（禁用）；`-1` 禁用对应结构，全禁用时不发速通者结构指南针。计时从正式开局开始，配置即时生效。例如 `/mhu config runner-structure-tracker-unlock-time.village 120`；使用 `/mhu config runner-structure-tracker-unlock-time.trial_chambers 0` 可立即开放试炼密室追踪。禁用项隐藏，待解锁项显示倒计时并禁止选择，详见[结构追踪解锁说明](docs/structure-tracker-unlock.md)。
 
 `allow-blaze-spawner-break` 默认为 `false`，只在正式游戏 RUNNING 时禁止破坏普通烈焰人刷怪笼，包含 OP 和局外玩家。空闲、倒计时及结算后允许破坏；其他种类刷怪笼不受此规则影响。通过 `/mhu config allow-blaze-spawner-break true` 或点击配置项可即时允许破坏。
 

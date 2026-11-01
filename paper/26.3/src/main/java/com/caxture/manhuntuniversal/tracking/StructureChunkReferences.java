@@ -53,7 +53,7 @@ final class StructureChunkReferences {
         }
     }
 
-    private static boolean matches(Key key, TrackingTargetId target) {
+    static boolean matches(Key key, TrackingTargetId target) {
         if (!"minecraft".equals(key.namespace())) {
             return false;
         }
@@ -64,6 +64,7 @@ final class StructureChunkReferences {
             };
             case NETHER_FORTRESS -> key.value().equals("fortress");
             case BASTION_REMNANT -> key.value().equals("bastion_remnant");
+            case TRIAL_CHAMBERS -> key.value().equals("trial_chambers");
             case NONE -> false;
         };
     }

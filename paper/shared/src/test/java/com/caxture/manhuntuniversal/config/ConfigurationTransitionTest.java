@@ -42,11 +42,12 @@ class ConfigurationTransitionTest {
         assertEquals(2, config.get(IntConfigKey.RUNNER_COUNT));
     }
     @Test void failedGroupSaveHasNoPartialStateOrUnlockNotification() {
-        var writer = new AtomicFileWriter((a,b) -> { throw new IOException("fail"); });
+        int[] saves={0};var writer = new AtomicFileWriter((a,b) -> { saves[0]++;throw new IOException("fail"); });
         var config = new ConfigurationService(temporary.resolve("config.yml").toFile(), writer, Logger.getAnonymousLogger());
         var registry = install(config); int[] changed = {0}; config.onStructureUnlockTimesChanged(() -> changed[0]++);
-        assertFalse(registry.update(owner, RunnerStructureUnlockTimes.CONFIG_KEY,
-                Map.of("village", 120, "bastion_remnant", 900, "nether_fortress", -1), -1).successful());
+        int before=saves[0];assertFalse(registry.update(owner, RunnerStructureUnlockTimes.CONFIG_KEY,
+                Map.of("village", 120, "bastion_remnant", 900, "nether_fortress", -1, "trial_chambers", -1), -1).successful());
+        assertEquals(before+1,saves[0]);
         assertEquals(0, changed[0]);
         assertEquals(0, config.values().runnerStructureUnlockTimes().village());
         assertEquals(0, config.values().runnerStructureUnlockTimes().bastionRemnant());

@@ -1,19 +1,21 @@
 # 速通者结构追踪解锁时间
 
-`runner-structure-tracker-unlock-time` 是一个包含三个子项的配置映射。数值为整数秒，计时起点为本局正式开局（RUNNING），不包含开局倒计时。以下为使用示例：
+`runner-structure-tracker-unlock-time` 是一个包含四个子项的配置映射。数值为整数秒，计时起点为本局正式开局（RUNNING），不包含开局倒计时。以下为使用示例：
 
 ```yaml
 runner-structure-tracker-unlock-time:
   village: 120
   bastion_remnant: 900
   nether_fortress: 1200
+  trial_chambers: -1
 ```
 
 - `village`：村庄。
 - `bastion_remnant`：堡垒遗迹。
 - `nether_fortress`：下界堡垒。
+- `trial_chambers`：试炼密室，在主世界定位，默认禁用。
 
-`0` 表示立即解锁，`-1` 表示禁用，正数为正式开局后的解锁秒数。默认三个值均为 `0`，保留原有开局即可追踪的行为。三个值均为 `-1` 时，不发放速通者结构追踪指南针，并移除已发放的绑定指南针、关闭其选择界面。猎人指南针不受影响；`runner-compass-enabled=false` 仍可单独关闭整个速通者指南针功能。
+`0` 表示立即解锁，`-1` 表示禁用，正数为正式开局后的解锁秒数。村庄、堡垒遗迹和下界堡垒默认 `0`，试炼密室默认 `-1`。四个值均为 `-1` 时，不发放速通者结构追踪指南针，并移除已发放的绑定指南针、关闭其选择界面。猎人指南针不受影响；`runner-compass-enabled=false` 仍可单独关闭整个速通者指南针功能。
 
 ## 命令与生效规则
 
@@ -22,6 +24,7 @@ runner-structure-tracker-unlock-time:
 /mhu config runner-structure-tracker-unlock-time.village 120
 /mhu config runner-structure-tracker-unlock-time.bastion_remnant 900
 /mhu config runner-structure-tracker-unlock-time.nether_fortress 1200
+/mhu config runner-structure-tracker-unlock-time.trial_chambers 0
 ```
 
 父项用于查询整组数据；以点路径修改子项。列表与父项查询显示同一组配置及可点击的子项，悬停显示内部名称，数值项点击预填对应命令。需要原有管理员权限。
@@ -32,11 +35,12 @@ runner-structure-tracker-unlock-time:
 - 速通者结构追踪解锁时间（秒） = {
     village: 300,
     bastion_remnant: 900,
-    nether_fortress: 0
+    nether_fortress: 0,
+    trial_chambers: -1
 }
 ```
 
-三个子项各自预填对应点路径命令，保留末尾空格；点击标题行也会预填第一个子项 village。
+四个子项各自预填对应点路径命令，保留末尾空格；点击标题行也会预填第一个子项 village。
 
 修改成功后即时按本局原始开局时间重算，不会重新开始计时。例如已开局 180 秒时将村庄设为 300 秒，剩余等待 120 秒。将已选目标禁用或重新锁定，会停止对该目标的追踪。保存失败时保留原值和当前行为；换角、复活及重连均不重置解锁时间。
 
@@ -46,7 +50,7 @@ runner-structure-tracker-unlock-time:
 
 禁用结构从 Fabric 与 Paper Dialog 中隐藏。仍在等待解锁的结构保留显示，但不能选择；服务端也会对每次点击独立校验，不依赖客户端是否显示为锁定。
 
-Fabric 界面每页最多三个选项，超过时分页；当页剩余选项按 1／2／3 列平均分配画布宽度，背景按对应宽度居中裁切。锁定选项正中央显示倒计时，字号为该选项实际英文名称的 2 倍，并保持水平和垂直居中；hover 不提亮，在客户端开启允许光标变化时显示禁止指针。
+Fabric 界面每页最多四个选项，超过时分页；当页剩余选项按 1／2／3／4 列平均分配画布宽度，背景按对应宽度居中裁切。锁定选项正中央显示倒计时，字号为该选项实际英文名称的 2 倍，并保持水平和垂直居中；hover 不提亮，在客户端开启允许光标变化时显示禁止指针。
 
 倒计时格式：
 
@@ -58,7 +62,7 @@ Fabric 界面每页最多三个选项，超过时分页；当页剩余选项按 
 
 小时与分钟保留一位小数。到达解锁时刻后移除倒计时并允许点击。客户端按收到的剩余时长用单调时钟逐帧计时，服务端每秒校正打开中的界面，避免依赖两台机器的系统时间相同。
 
-Paper Dialog 在按钮文字后显示相同格式，例如 `Village | 3.2min`。锁定按钮没有选择动作，点击不会关闭界面；解锁后恢复选择。Esc 或取消会保留已有追踪选择并停止刷新，不重新弹出窗口。选择、关闭、离线、淘汰及对局清理均会释放本次界面授权。
+Paper Dialog 最多四列，四个结构全部启用时可同排显示。在按钮文字后显示相同格式，例如 `Village | 3.2min`。锁定按钮没有选择动作，点击不会关闭界面；解锁后恢复选择。Esc 或取消会保留已有追踪选择并停止刷新，不重新弹出窗口。选择、关闭、离线、淘汰及对局清理均会释放本次界面授权。
 
 ## 更新与兼容
 
@@ -66,10 +70,19 @@ Paper Dialog 在按钮文字后显示相同格式，例如 `Village | 3.2min`。
 
 公共扩展 API 和 SDK 为 **1.1.0**；扩展可注册新目标并沿用同一解锁/授权界面，详见 [API 1.1 指南](extension-api-1.1.md)。
 
-已有外部语言文件不会自动改写。可手动从新内置资源合并 `config.map-start`、`config.structure-unlock-usage`、`config.name.runner-structure-tracker-unlock-time` 下的标题和三个子项，以及 `tracking.dialog.locked-tooltip`、`tracking.selection.unlocked`。缺失时回退到内置语言。
+已有外部语言文件不会自动改写。可手动从新内置资源合并 `config.map-start`、`config.structure-unlock-usage`、`config.name.runner-structure-tracker-unlock-time` 下的标题和四个子项，以及 `tracking.dialog.locked-tooltip`、`tracking.selection.unlocked`。缺失时回退到内置语言。
 
 ## 解锁通知更新验证（此前版本记录）
 
 两个 `-PmcVersion` 独立构建均通过。针对性检查共 253 项，其中两版 Paper 各 110 项；新增检查覆盖到期通知、立即解锁／禁用不通知、重复检查／同局追踪重启去重、配置重锁和下一局，以及结构查询取消不影响传送门队列。双语 125 个键及占位符一致，四个部署 JAR 的元数据、字节码目标与 SHA-256 已核对，交付在 `dist`。
 
 本次没有启动游戏实例或进行性能采样；队列缓存调整只确认减少重复查询，不能据此声称首次定位卡顿已消除。查询流程及后续方向见 [追踪性能说明](tracking-performance.md)。
+
+
+## 试炼密室与四列更新
+
+旧三项配置会按现有补默认值机制增加 `trial_chambers: -1`，不改变其他三项。试炼密室支持同样的正数解锁时间和通知；开启后在原版 Dialog/Fabric 动态目录中出现。四个结构全部可见时，Fabric 在同一页按四列等宽展示；超过四个扩展目标才分页，每页最多四项。
+
+背景贴图随新模组提供，无需额外资源包；缺失该材质的协议3客户端仍可使用颜色回退。服务端没有为试炼密室增加 legacy 选择枚举或变更消息格式，协议仍为3；旧/无模组客户端继续走动态 Paper Dialog。升级说明仅需手动合并新增 `config.name.runner-structure-tracker-unlock-time.trial_chambers`、`tracking.target.trial-chambers` 与配置帮助；外部语言文件不会自动改写。
+
+验证见[本次检查记录](verification/trial-chambers-tracking.md)。

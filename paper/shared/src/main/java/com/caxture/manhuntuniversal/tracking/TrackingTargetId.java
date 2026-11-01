@@ -8,6 +8,7 @@ public enum TrackingTargetId {
     VILLAGE("village", TrackingWorldKind.OVERWORLD),
     NETHER_FORTRESS("nether-fortress", TrackingWorldKind.NETHER),
     BASTION_REMNANT("bastion-remnant", TrackingWorldKind.NETHER),
+    TRIAL_CHAMBERS("trial-chambers", TrackingWorldKind.OVERWORLD),
     NONE("none", null);
 
     private final String id;
@@ -33,6 +34,7 @@ public enum TrackingTargetId {
     public boolean selectableByRunner() {
         return this != NONE;
     }
+    public boolean legacySelectorSupported() { return this != TRIAL_CHAMBERS; }
 
     public static Optional<TrackingTargetId> fromId(String id) {
         if (id == null) {

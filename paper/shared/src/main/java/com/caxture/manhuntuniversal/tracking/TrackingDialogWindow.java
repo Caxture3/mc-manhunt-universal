@@ -46,7 +46,7 @@ final class TrackingDialogWindow<A> {
 
     void select(long revision, TrackingTargetId target) {
         if (!active || revision != actionRevision
-                || !availability.unlocked(TrackingSelectionTargetMapper.toProtocol(target))) return;
+                || !StructureUnlockPolicy.allows(target,availability)) return;
         active = false;
         selectionHandler.accept(currentSelection == target ? TrackingTargetId.NONE : target);
     }

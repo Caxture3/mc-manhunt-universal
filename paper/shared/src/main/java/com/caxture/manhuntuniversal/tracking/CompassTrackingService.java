@@ -765,6 +765,8 @@ public final class CompassTrackingService {
                     origin, Structure.FORTRESS, work.key().radiusChunks(), false));
             case BASTION_REMNANT -> locationOf(world.locateNearestStructure(
                     origin, Structure.BASTION_REMNANT, work.key().radiusChunks(), false));
+            case TRIAL_CHAMBERS -> locationOf(world.locateNearestStructure(
+                    origin, Structure.TRIAL_CHAMBERS, work.key().radiusChunks(), false));
             default -> null;
         };
         work.complete(Optional.ofNullable(result).map(CompassTrackingService::point));

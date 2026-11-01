@@ -21,7 +21,7 @@ final class StructureUnlockAnnouncements {
         List<TrackingTargetId> unlocked = new ArrayList<>();
         if (previous != null) {
             for (TrackingTargetId target : TrackingTargetId.values()) {
-                if (!target.selectableByRunner()) continue;
+                if (!target.selectableByRunner() || !target.legacySelectorSupported()) continue;
                 var protocolTarget = TrackingSelectionTargetMapper.toProtocol(target);
                 if (previous.remainingMillis(protocolTarget) > 0 && current.unlocked(protocolTarget)) {
                     unlocked.add(target);

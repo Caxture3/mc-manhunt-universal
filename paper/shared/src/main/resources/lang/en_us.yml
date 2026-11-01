@@ -67,7 +67,7 @@ config:
   value-overridden: " §7(saved: {value})"
   next-match: "Applies to the next match; locked roles and search settings stay unchanged."
   map-start: "§7- §e{key}§7 = {"
-  structure-unlock-usage: "{prefix}§eUsage: /mhu config runner-structure-tracker-unlock-time.<village|bastion_remnant|nether_fortress> <seconds, -1 disables>"
+  structure-unlock-usage: "{prefix}§eUsage: /mhu config runner-structure-tracker-unlock-time.<village|bastion_remnant|nether_fortress|trial_chambers> <seconds, -1 disables>"
   header: "{prefix}§fConfiguration:"
   entry: "§7- §e{key}§7 = §f{value}"
   unknown: "{prefix}§cUnknown configuration key: {key}"
@@ -86,6 +86,7 @@ config:
       village: "Village unlock time (seconds)"
       bastion_remnant: "Bastion remnant unlock time (seconds)"
       nether_fortress: "Nether fortress unlock time (seconds)"
+      trial_chambers: "Trial Chambers unlock time (seconds)"
     force-random-roles: "Force random role assignment"
     hide-role-assignments: "Hide role assignments"
     ore-fortune-level: "Virtual ore Fortune level"
@@ -146,6 +147,7 @@ tracking:
   target:
     village: "Village"
     nether-fortress: "Nether Fortress"
+    trial-chambers: "Trial Chambers"
     bastion-remnant: "Bastion Remnant"
     none: "None"
   dimension:

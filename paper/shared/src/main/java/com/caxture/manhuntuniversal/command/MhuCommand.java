@@ -315,6 +315,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         entries.put("village", Integer.toString(times.village()));
         entries.put("bastion_remnant", Integer.toString(times.bastionRemnant()));
         entries.put("nether_fortress", Integer.toString(times.netherFortress()));
+        entries.put("trial_chambers", Integer.toString(times.trialChambers()));
         InteractiveMessages.configMap(heading, key, entries, sender instanceof Player)
                 .forEach(line -> language.sendComponent(sender, "core:config." + key, line));
     }

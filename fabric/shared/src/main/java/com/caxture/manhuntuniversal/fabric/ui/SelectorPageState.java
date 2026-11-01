@@ -3,6 +3,7 @@ import com.caxture.manhuntuniversal.protocol.TrackingTargetDescriptor;
 import java.util.*;
 /** Pure dynamic selector state; time estimates never grant server authorization. */
 public final class SelectorPageState {
+    private static final int OPTIONS_PER_PAGE=4;
     private List<TrackingTargetDescriptor> all = List.of();
     private Optional<String> selected = Optional.empty();
     private long revision = -1, receivedAt;
@@ -17,10 +18,10 @@ public final class SelectorPageState {
     public long revision() { return revision; }
     public Optional<String> selection() { return selected; }
     public int page() { return page; }
-    public int pages() { return Math.max(1, Math.ceilDiv(all.size(), 3)); }
+    public int pages() { return Math.max(1, Math.ceilDiv(all.size(), OPTIONS_PER_PAGE)); }
     public void next() { page = (page + 1) % pages(); }
     public void previous() { page = Math.floorMod(page - 1, pages()); }
-    public List<TrackingTargetDescriptor> options() { return all.subList(page * 3, Math.min(all.size(), page * 3 + 3)); }
+    public List<TrackingTargetDescriptor> options() { return all.subList(page * OPTIONS_PER_PAGE, Math.min(all.size(), page * OPTIONS_PER_PAGE + OPTIONS_PER_PAGE)); }
     public long remaining(TrackingTargetDescriptor option, long now) { return Math.max(0, option.remainingMillis() - Math.max(0, (now - receivedAt) / 1_000_000L)); }
     public boolean enabled(TrackingTargetDescriptor option, long now) { return option.selectable() || option.remainingMillis() > 0 && remaining(option, now) == 0; }
     public SelectorRect panel(SelectorRect canvas, int index) {

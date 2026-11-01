@@ -76,7 +76,7 @@ api.features().policy(owner, CoreFeatureIds.ORE_FORTUNE, 100,
 
 ## 动态追踪目标
 
-`TrackingTargetDefinition` 使用稳定命名空间 ID、本地化主/副标题及说明、排序、目标维度、外观、可用性策略和定位 provider。内置 ID 为 `core:village`、`core:bastion_remnant`、`core:nether_fortress`，通过适配器继续调用原有结构算法；替换下界要塞定位器后可用 `LocateResult.core()` 显式委托原算法，保留最近烈焰人刷怪笼及其回退逻辑。
+`TrackingTargetDefinition` 使用稳定命名空间 ID、本地化主/副标题及说明、排序、目标维度、外观、可用性策略和定位 provider。内置 ID 为 `core:village`、`core:bastion_remnant`、`core:nether_fortress`、`core:trial_chambers`，通过适配器继续调用原有结构算法；替换下界要塞定位器后可用 `LocateResult.core()` 显式委托原算法，保留最近烈焰人刷怪笼及其回退逻辑。
 
 ```java
 api.tracking().register(owner, new TrackingTargetDefinition(
@@ -98,7 +98,7 @@ api.tracking().register(owner, new TrackingTargetDefinition(
 
 | 限制 | 值与语义 |
 | --- | --- |
-| 动态目录 | 最多 32 个目标，包含 3 个内置目标 |
+| 动态目录 | 最多 32 个目标，包含 4 个内置目标（最多再注册28个扩展目标） |
 | 定位并发 | 最多 8 项实际未完成工作，等待队列最多 128 |
 | 超时 | 入队起 10 秒；超时/取消后真实工作完成前仍占并发配额 |
 | 缓存 | 自定义目标正结果 30 秒、负结果 5 秒，最多 512 条 |
@@ -111,7 +111,7 @@ api.tracking().register(owner, new TrackingTargetDefinition(
 
 ## Fabric 与资源包
 
-选择协议升级为 **3**，hello 外形、频道和 Mod ID 保留；版本不匹配、未安装模组或发送失败时回退 Paper Dialog。两种菜单使用同一份服务端目录；已安装模组每页最多三个等宽选项，可翻页，保持选中项和实时锁定倒计时。旧协议客户端不会收到动态目录。
+选择协议升级为 **3**，hello 外形、频道和 Mod ID 保留；版本不匹配、未安装模组或发送失败时回退 Paper Dialog。两种菜单使用同一份服务端目录；已安装模组每页最多四个等宽选项，可翻页，保持选中项和实时锁定倒计时。旧协议客户端不会收到动态目录。
 
 扩展可选择内置主题、ARGB 颜色、原版物品图标，或指定现有资源 ID（例如 `example:textures/gui/checkpoint.png`）。自定义材质可放在服务端资源包的 `assets/example/textures/gui/checkpoint.png`，由服务器原有资源包机制提供，制作、托管及玩家接受由服主负责。协议不传图片、URL、NBT 或客户端代码。
 

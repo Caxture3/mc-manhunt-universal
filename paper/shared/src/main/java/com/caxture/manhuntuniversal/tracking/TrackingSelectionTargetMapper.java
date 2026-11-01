@@ -12,6 +12,7 @@ public final class TrackingSelectionTargetMapper {
             case VILLAGE -> TrackingSelectionTarget.VILLAGE;
             case NETHER_FORTRESS -> TrackingSelectionTarget.NETHER_FORTRESS;
             case BASTION_REMNANT -> TrackingSelectionTarget.BASTION_REMNANT;
+            case TRIAL_CHAMBERS -> throw new IllegalArgumentException("Trial Chambers requires the dynamic tracking selector");
         };
     }
 
