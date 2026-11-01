@@ -68,7 +68,7 @@ Paper Dialog 最多四列，四个结构全部启用时可同排显示。在按�
 
 服务端与配套模组的选择界面协议升级为 **3**，支持动态目标目录、可用性状态和刷新消息，保留原频道、Mod ID 及资源命名空间。两端同时更新才能使用新的 Fabric 界面；协议不匹配时使用 Paper Dialog，服务端解锁限制仍然有效。
 
-公共扩展 API 和 SDK 为 **1.1.0**；扩展可注册新目标并沿用同一解锁/授权界面，详见 [API 1.1 指南](extension-api-1.1.md)。
+公共扩展 API 和 SDK 为 **1.2.0**；扩展可注册新目标并沿用同一解锁/授权界面，详见 [API 1.1 指南](extension-api-1.1.md)。
 
 已有外部语言文件不会自动改写。可手动从新内置资源合并 `config.map-start`、`config.structure-unlock-usage`、`config.name.runner-structure-tracker-unlock-time` 下的标题和四个子项，以及 `tracking.dialog.locked-tooltip`、`tracking.selection.unlocked`。缺失时回退到内置语言。
 

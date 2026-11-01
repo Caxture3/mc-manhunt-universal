@@ -31,6 +31,24 @@ import java.util.logging.Logger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PaperExtensionServiceTest {
+    @Test void offlineEliminationClearsTrackingBeforePublishingTheEventAndRevivalDoesNotRestoreIt() throws Exception {
+        Harness h=new Harness();h.offline.add(A);
+        var field=PaperExtensionService.class.getDeclaredField("children");field.setAccessible(true);var children=(OwnedRegistry)field.get(h.service);
+        var targets=new TrackingRegistryService(children,new TrackingRegistryService.Runtime(){
+            public Optional<TrackingViewerContext> viewer(UUID id){return Optional.empty();}public boolean maySelect(UUID id){return false;}
+            public Optional<String> selection(UUID id){return Optional.empty();}public void selection(UUID id,String target){}
+            public Optional<TrackingSnapshot> snapshot(UUID id){return Optional.empty();}public void refresh(UUID id){}
+            public void invalidate(TrackingInvalidation scope){}public void catalogChanged(){}
+        });
+        var control=new com.caxture.manhuntuniversal.extension.tracking.TrackingControlService(children,()->Optional.of(h.snapshot()),id->true,id->true,()->0,id->{});
+        targets.installControl(control);field=PaperExtensionService.class.getDeclaredField("trackingRegistry");field.setAccessible(true);field.set(h.service,targets);
+        var owner=h.register("tasks",Set.of(ControlDomain.TRACKING,ControlDomain.PARTICIPANTS));
+        var handle=control.apply(new TrackingControlMutation(new TrackingMutation(new MutationContext(owner,h.session.id(),h.session.revision(),"task"),A),0),TrackingOverrideRequest.disabled()).value().orElseThrow();
+        h.listener=event->{if(event instanceof ParticipantEliminatedEvent)assertFalse(handle.active());};
+        assertTrue(h.service.participants().eliminate(h.context(owner),A).successful());
+        assertFalse(handle.active());assertEquals(TrackingOverrideMode.DEFAULT,control.snapshot(A).orElseThrow().mode());
+        assertTrue(h.service.participants().revive(h.context(owner),A).successful());assertTrue(control.binding(A).isEmpty());
+    }
     @Test void coreDebugChangesOnlyTheRequestedOfflinePlayerAndRetainsTheExtensionOwner() {
         Harness h=new Harness();var owner=h.register("mode",Set.of(ControlDomain.ROLES));h.offline.add(C);
         var result=h.service.debugSetRole(h.session.id(),h.session.revision(),C,TeamRole.RUNNER);
@@ -99,7 +117,7 @@ class PaperExtensionServiceTest {
         var trackingField = PaperExtensionService.class.getDeclaredField("trackingRegistry"); trackingField.setAccessible(true); trackingField.set(h.service,targets);
         com.caxture.manhuntuniversal.api.paper.PaperManhuntUniversalApi api = h.service;
         var owner = h.register("example:integrated",Set.of());
-        assertEquals("1.1.0",api.apiVersion());
+        assertEquals("1.2.0",api.apiVersion());
         assertTrue(api.capabilities().containsAll(Set.of(Capability.CONFIGURATION_REGISTRY,Capability.DYNAMIC_TRACKING)));
         int[] stored = {1};
         assertTrue(api.configuration().register(owner,new ConfigDefinition<>("example:count",LocalizedText.of("Count"),LocalizedText.of(""),1,

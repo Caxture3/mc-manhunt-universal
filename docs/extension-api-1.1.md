@@ -1,6 +1,6 @@
 # 扩展 API 1.1 使用指南
 
-SDK 版本为 **1.1.0**，插件与 Fabric 模组版本为 **1.0.0**。API 1.0 的对局、角色、淘汰、胜负策略和事件仍可用，原有二进制调用保留。扩展通过 Bukkit `ServicesManager` 获取 `PaperManhuntUniversalApi`，检查 `apiVersion()` 的主版本和所需 `capabilities()`，再注册插件绑定的 `ExtensionRegistration`。基础依赖和角色轮换示例见[原有接口指南](extension-api.md)。
+本文介绍的 1.1 接口继续保留；当前 SDK 版本为 **1.2.0**，插件与 Fabric 模组版本为 **1.0.0**。API 1.0 的对局、角色、淘汰、胜负策略和事件仍可用，原有二进制调用保留。扩展通过 Bukkit `ServicesManager` 获取 `PaperManhuntUniversalApi`，检查 `apiVersion()` 的主版本和所需 `capabilities()`，再注册插件绑定的 `ExtensionRegistration`。基础依赖和角色轮换示例见[原有接口指南](extension-api.md)。
 
 扩展可以注册服务端追踪目标，直接出现在配套 Fabric 模组与原版 Paper Dialog 中。玩家只需更新本项目的配套模组，无需安装该扩展的额外 Fabric 模组。
 
@@ -126,3 +126,5 @@ api.tracking().register(owner, new TrackingTargetDefinition(
 核心现支持正常重启续局：已有会话在服务注册完成时即可查询；扩展须在自身 onEnable 检查当前会话并恢复自己的任务/数据。RUNNING 续局不重发新开局事件。见[续局职责说明](runtime-continuity.md)。
 
 `roles().assign` 与 `roles().reroll` 现支持离线且未淘汰的参与者；在线死亡/待重置者仍保留安全限制。离线变更在重连时应用，未淘汰状态、待重置记录、末地解锁和已知位置会保留，见[角色接口规则](extension-api.md)。
+
+双方角色强制追踪与实时玩家目标见 [API 1.2 指南](extension-api-1.2.md)。

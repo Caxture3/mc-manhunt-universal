@@ -7,3 +7,5 @@
 示例源码纳入 `:api-paper:compileExamplesJava`，两版构建的 `check` 都会编译它们。示例没有自动打包、安装或启用；需要使用时复制到自己的 Paper 插件工程，并采用 [plugin.yml](src/main/resources/plugin.yml)。依赖配置和完整规则见[扩展指南](../../docs/extension-api-1.1.md)。
 
 主示例的配置只保存在内存，不会为服务器写入文件。追踪目标返回玩家当前维度中的检查点，不会访问或生成区块。要接管核心掉落，应将对应功能策略改为 `SKIP_CORE`，并由扩展自己的 Paper 监听器实现完整效果；示例默认返回 `DEFAULT`，不会改变现有掉落。
+
+[TrackingControlExample](src/main/java/example/mhu/TrackingControlExample.java) 使用 API 1.2，演示双方角色的强制结构/玩家追踪、最近猎人、暂停和 DEFAULT 恢复。注册需额外申请独占 TRACKING 域并检查两个新能力；详见 [API 1.2 指南](../../docs/extension-api-1.2.md)。此 helper 不会自动启用或创建任务调度。

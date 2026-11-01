@@ -135,7 +135,7 @@ Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版
 
 聊天前缀按客户端语言显示为 `穹猎追杀` / `Manhunt Universal`。升级不会自动改写 `plugins/ManhuntUniversal/lang/` 下的旧语言文件；已有服务器请按 [语言更新说明](docs/lobby-config.md) 手动更新相关条目。
 
-SDK 独立版本为 **1.1.0**，六个 SDK JAR 位于 `dist/sdk/`；四个可部署插件/模组及 SHA-256 清单位于 `dist/`。扩展可通过服务端 API 注册新追踪目标，无需附加 Fabric 模组；自定义材质可选用资源包，缺失时自动回退。两端选择协议为 **3**，旧模组或未安装模组的客户端使用 Paper Dialog。接入与验证边界见[API 1.1 指南](docs/extension-api-1.1.md)。
+SDK 独立版本为 **1.2.0**，六个 SDK JAR 位于 `dist/sdk/`；四个可部署插件/模组及 SHA-256 清单位于 `dist/`。扩展可通过服务端 API 注册新追踪目标，无需附加 Fabric 模组；自定义材质可选用资源包，缺失时自动回退。两端选择协议为 **3**，旧模组或未安装模组的客户端使用 Paper Dialog。强制追踪支持双方角色、任意玩家与实时目标。接入见 [API 1.1 指南](docs/extension-api-1.1.md)和 [API 1.2 追踪控制指南](docs/extension-api-1.2.md)。
 
 ## 相关说明
 

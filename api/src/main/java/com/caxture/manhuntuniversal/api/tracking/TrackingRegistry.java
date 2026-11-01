@@ -2,6 +2,8 @@ package com.caxture.manhuntuniversal.api.tracking;
 
 /** Main-thread target catalog, authorization and locating service. */
 public interface TrackingRegistry {
+    /** Optional since 1.2; check FORCED_TRACKING capability first. */
+    default TrackingControl control() { throw new UnsupportedOperationException("Tracking control requires API 1.2"); }
     java.util.List<TrackingTargetInfo> list();
     java.util.Optional<TrackingMenuSnapshot> menu(java.util.UUID playerId);
     java.util.Optional<TrackingSnapshot> snapshot(java.util.UUID playerId);

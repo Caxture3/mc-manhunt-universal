@@ -2,7 +2,7 @@
 
 Manhunt Universal 提供公共 Java API 和 Paper 服务、事件，让依赖插件管理对局、分配角色、淘汰和复活参与者，以及接管默认判胜。核心默认仍为每局固定身份；安装核心不会自动开启定时轮换。
 
-`api` 与 `api-paper` 的 API 版本独立于插件版本，当前为 `1.1.0`。纯 Java 包为 `com.caxture.manhuntuniversal.api`，只依赖 Java 21；Paper 服务位于 `com.caxture.manhuntuniversal.api.paper`，事件位于其 `event` 子包。内部 `game`、`runtime`、`tracking` 包不属于公共兼容接口。Fabric 网络协议不因服务端扩展改变。
+`api` 与 `api-paper` 的 API 版本独立于插件版本，当前为 `1.2.0`。纯 Java 包为 `com.caxture.manhuntuniversal.api`，只依赖 Java 21；Paper 服务位于 `com.caxture.manhuntuniversal.api.paper`，事件位于其 `event` 子包。内部 `game`、`runtime`、`tracking` 包不属于公共兼容接口。Fabric 网络协议不因服务端扩展改变。
 
 ## 编译依赖
 
@@ -12,7 +12,7 @@ Manhunt Universal 提供公共 Java API 和 Paper 服务、事件，让依赖插
 .\gradlew.bat :api:build :api-paper:build '-PmcVersion=1.21.11'
 ```
 
-将 `api/build/libs/manhunt-universal-api-1.1.0.jar` 和 `api-paper/build/libs/manhunt-universal-api-paper-1.1.0.jar` 复制到扩展工程的 `libs/`。这些是编译 SDK；服务器安装对应 Minecraft 版本的 `manhunt-universal-paper-*` 部署 JAR，核心已包含 API 类。
+将 `api/build/libs/manhunt-universal-api-1.2.0.jar` 和 `api-paper/build/libs/manhunt-universal-api-paper-1.2.0.jar` 复制到扩展工程的 `libs/`。这些是编译 SDK；服务器安装对应 Minecraft 版本的 `manhunt-universal-paper-*` 部署 JAR，核心已包含 API 类。
 
 扩展的 `build.gradle.kts` 示例：
 
@@ -25,8 +25,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly(files("libs/manhunt-universal-api-1.1.0.jar"))
-    compileOnly(files("libs/manhunt-universal-api-paper-1.1.0.jar"))
+    compileOnly(files("libs/manhunt-universal-api-1.2.0.jar"))
+    compileOnly(files("libs/manhunt-universal-api-paper-1.2.0.jar"))
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
 }
 

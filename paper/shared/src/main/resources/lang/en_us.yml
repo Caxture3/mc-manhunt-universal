@@ -161,6 +161,7 @@ tracking:
     lore-runner-use: "§7Hold to view the target; right-click to choose."
     lore-hunter-use: "§7Hold to track the nearest speedrunner."
     lore-bound: "§cGame item: cannot be dropped or stored in containers"
+    lore-extension: "§7Tracking is managed by a game extension."
     no-space: "{prefix}§cFree an inventory slot to receive your tracking compass."
   dialog:
     locked-tooltip: "§7Unlocks in {time}; selection is currently disabled"
@@ -173,6 +174,7 @@ tracking:
     changed: "{prefix}§aTracking target changed to {target}."
     cleared: "{prefix}§eTracking stopped."
   actionbar:
+    disabled: "§7Tracking is paused"
     same-dimension: "§f{target} §7| Distance: §e{distance} {unit} §7| {dimension}"
     cross-dimension: "§f{target} §7| Distance: §e-- §7| {dimension}"
     hunter-live: "§f{target} §7| Distance: §e{distance} {unit} §7| {dimension}"

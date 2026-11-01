@@ -161,6 +161,7 @@ tracking:
     lore-runner-use: "§7手持查看目标；右键选择追踪目标。"
     lore-hunter-use: "§7手持时追踪最近的速通者。"
     lore-bound: "§c对局物品：不可丢弃或放入容器"
+    lore-extension: "§7追踪目标由玩法扩展管理。"
     no-space: "{prefix}§c请腾出一格背包空间以接收追踪指南针。"
   dialog:
     locked-tooltip: "§7将在 {time} 后解锁，当前不可选择"
@@ -173,6 +174,7 @@ tracking:
     changed: "{prefix}§a已切换追踪目标：{target}。"
     cleared: "{prefix}§e已停止追踪。"
   actionbar:
+    disabled: "§7追踪已暂停"
     same-dimension: "§f{target} §7| 距离：§e{distance}{unit} §7| {dimension}"
     cross-dimension: "§f{target} §7| 距离：§e-- §7| {dimension}"
     hunter-live: "§f{target} §7| 距离：§e{distance}{unit} §7| {dimension}"

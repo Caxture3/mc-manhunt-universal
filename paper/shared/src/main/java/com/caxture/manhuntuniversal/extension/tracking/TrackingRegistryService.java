@@ -11,6 +11,7 @@ public final class TrackingRegistryService implements TrackingRegistry {
     public interface Runtime {
         Optional<TrackingViewerContext> viewer(UUID player);
         boolean maySelect(UUID player);
+        default boolean overridden(UUID player) { return false; }
         Optional<String> selection(UUID player);
         void selection(UUID player, String target);
         Optional<TrackingSnapshot> snapshot(UUID player);
@@ -34,6 +35,10 @@ public final class TrackingRegistryService implements TrackingRegistry {
     private final Set<UUID> knownPlayers = new HashSet<>();
     private Consumer<TrackingChange> changed = ignored -> {};
     private long revision;
+    private TrackingControl control;
+    public void installControl(TrackingControl value) { owned.requireThread(); control=Objects.requireNonNull(value); }
+    @Override public TrackingControl control() { owned.requireThread(); if(control==null)throw new UnsupportedOperationException("Tracking control unavailable");return control; }
+    public void participantEliminated(UUID player) { owned.requireThread();if(control instanceof TrackingControlService service)service.clearPlayer(player); }
     @FunctionalInterface public interface Labels{String resolve(TrackingViewerContext viewer,String target,String field,LocalizedText fallback);}
     private Labels labels=(viewer,target,field,fallback)->fallback.resolve(viewer.locale());
     public void labels(Labels resolver){owned.requireThread();labels=Objects.requireNonNull(resolver);}
@@ -114,7 +119,7 @@ public final class TrackingRegistryService implements TrackingRegistry {
         if (old != null && !old.sameState(current)) {
             emit(new TrackingChange(TrackingChange.Kind.AVAILABILITY, viewer.playerId(), entry.value.id(), Optional.empty(), Optional.of(old), Optional.of(current), source));
         }
-        if (!current.selectable() && runtime.selection(viewer.playerId()).filter(entry.value.id()::equals).isPresent())changeSelection(viewer.playerId(),null,source);
+        if (!runtime.overridden(viewer.playerId()) && !current.selectable() && runtime.selection(viewer.playerId()).filter(entry.value.id()::equals).isPresent())changeSelection(viewer.playerId(),null,source);
         return current;
     }
     @Override public Optional<TrackingSnapshot> snapshot(UUID player) { owned.requireThread(); return runtime.viewer(player).isEmpty() ? Optional.empty() : Optional.of(currentSnapshot(player)); }

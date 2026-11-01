@@ -135,13 +135,14 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         presentationRegistry = new com.caxture.manhuntuniversal.extension.presentation.PresentationRegistryService(children, () -> hideRoles.getAsBoolean());
     }
 
-    @Override public String apiVersion() { return "1.1.0"; }
+    @Override public String apiVersion() { return "1.2.0"; }
     @Override public Set<Capability> capabilities() {
         var supported=EnumSet.of(Capability.MATCH_QUERY,Capability.MATCH_CONTROL,Capability.ROLE_CONTROL,Capability.PARTICIPANT_CONTROL,
                 Capability.ELIMINATION_POLICY,Capability.VICTORY_POLICY,Capability.PAPER_EVENTS);
         if(configurationRegistry!=null)supported.addAll(Set.of(Capability.CONFIGURATION_REGISTRY,Capability.FEATURE_POLICIES,Capability.TEXT_OVERRIDES,Capability.PRESENTATION_CONTROL));
         if(observerIdentity!=null)supported.add(Capability.OBSERVER_IDENTITY);
-        if(trackingRegistry!=null)supported.addAll(Set.of(Capability.DYNAMIC_TRACKING,Capability.ASYNC_TRACKING_LOCATORS,Capability.TRACKING_EVENTS));
+        if(trackingRegistry!=null)supported.addAll(Set.of(Capability.DYNAMIC_TRACKING,Capability.ASYNC_TRACKING_LOCATORS,Capability.TRACKING_EVENTS,
+                Capability.FORCED_TRACKING,Capability.REALTIME_PLAYER_TRACKING));
         return Set.copyOf(supported);
     }
     @Override public MatchQuery matches() { return query; }
@@ -469,7 +470,8 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         });
     }
     @Override public void eliminated(GameSession session, UUID id, String cause) {
-        inMutation(() -> { fire(new ParticipantEliminatedEvent(MatchSnapshots.of(session), id, cause)); return null; });
+        inMutation(() -> { if(trackingRegistry!=null)trackingRegistry.participantEliminated(id);
+            fire(new ParticipantEliminatedEvent(MatchSnapshots.of(session), id, cause)); return null; });
     }
     @Override public void revived(GameSession session, UUID id) {
         inMutation(() -> { fire(new ParticipantRevivedEvent(MatchSnapshots.of(session), id)); return null; });

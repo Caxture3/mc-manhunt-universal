@@ -173,6 +173,7 @@ public final class CompassTrackingService {
     }
 
     public void tick(GameSession session) {
+        if(extensions!=null)extensions.samplePlayers();
         maintain(session);
         if (isTracking(session)) {
             refreshDistanceDisplays(session);
@@ -238,7 +239,9 @@ public final class CompassTrackingService {
                 } else closeSelection(player);
             });
             TrackingDisplay display;
-            if (kind == TrackingCompassKind.HUNTER) {
+            if (extensions != null && extensions.overridden(participant.id())) {
+                display = overrideDisplay(player, now, true);
+            } else if (kind == TrackingCompassKind.HUNTER) {
                 display = hunterDisplay(session, player);
             } else {
                 if (extensions != null) extensions.maintain(player);
@@ -283,7 +286,8 @@ public final class CompassTrackingService {
                 showActionBarIfHeld(session, player, kind, display);
                 continue;
             }
-            if (kind == TrackingCompassKind.HUNTER) display = hunterDisplay(session, player);
+            if (extensions != null && extensions.overridden(participant.id())) display = overrideDisplay(player, Instant.now(clock), false);
+            else if (kind == TrackingCompassKind.HUNTER) display = hunterDisplay(session, player);
             else {
                 TrackingTargetId selected = state.runnerSelection(participant.id());
                 display = extensions != null && extensions.handles(participant.id()) ? extendedDisplay(player, false)
@@ -291,6 +295,7 @@ public final class CompassTrackingService {
                         : staticDisplay(player, selected, Instant.now(clock), false);
             }
             lastDisplays.put(participant.id(), display);
+            if(extensions!=null&&extensions.playerOverride(participant.id()))applyDirection(player,display.direction(),display.invalidDirectionWorld());
             showActionBarIfHeld(session, player, kind, display);
         }
     }
@@ -346,6 +351,7 @@ public final class CompassTrackingService {
     }
 
     public void playerQuit(Player player) {
+        if (extensions != null) extensions.observe(player);
         if (extensions != null) extensions.leave(player.getUniqueId());
         recordCurrentPosition(player);
         invalidateParticipant(player.getUniqueId());
@@ -355,7 +361,7 @@ public final class CompassTrackingService {
     }
 
     public void recordCurrentPosition(Player player) {
-        if (state != null) {
+        if (state != null && runningSession().flatMap(value->value.participant(player.getUniqueId())).isPresent()) {
             state.recordPosition(player.getUniqueId(), position(player.getLocation()));
         }
     }
@@ -454,6 +460,7 @@ public final class CompassTrackingService {
     }
 
     public void runnerEliminated(Player player) {
+        if(extensions!=null)extensions.control.clearPlayer(player.getUniqueId());
         invalidateParticipant(player.getUniqueId());
         closeSelection(player);
         removeMarkedCompasses(player);
@@ -1018,7 +1025,7 @@ public final class CompassTrackingService {
         var names = languages.item(player, "core:compass.name", false, List.of(languages.component(player, "tracking.compass.name", Map.of())));
         meta.itemName(names.isEmpty() ? Component.empty() : names.getFirst());
         meta.lore(languages.item(player, "core:compass.lore", true, List.of(
-                languages.component(player, kind == TrackingCompassKind.RUNNER
+                languages.component(player, extensions!=null&&extensions.overridden(player.getUniqueId())?"tracking.compass.lore-extension":kind == TrackingCompassKind.RUNNER
                         ? "tracking.compass.lore-runner-use"
                         : "tracking.compass.lore-hunter-use", Map.of()),
                 languages.component(player, "tracking.compass.lore-bound", Map.of()))));
@@ -1094,6 +1101,9 @@ public final class CompassTrackingService {
             }
             CompassMeta meta = (CompassMeta) item.getItemMeta();
             Location lodestone = direction;
+            if(lodestone==null&&extensions!=null&&extensions.overridden(player.getUniqueId())) {
+                TrackingCompassDirection.pause(meta);item.setItemMeta(meta);continue;
+            }
             if (lodestone == null
                     && invalidDirectionWorld != null
                     && !invalidDirectionWorld.equals(player.getWorld())) {
@@ -1135,6 +1145,7 @@ public final class CompassTrackingService {
     private Optional<TrackingCompassKind> expectedKind(GameSession session, UUID playerId) {
         if (session.isEliminatedParticipant(playerId)) return Optional.empty();
         Role role = session.roleOf(playerId).orElse(null);
+        if(extensions!=null&&extensions.overridden(playerId)&&role!=null)return Optional.of(role==Role.RUNNER?TrackingCompassKind.RUNNER:TrackingCompassKind.HUNTER);
         if (role == Role.RUNNER
                 && configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED)
                 && (extensions == null ? configuration.values().runnerStructureUnlockTimes().anyEnabled() : extensions.visible(playerId))) {
@@ -1230,6 +1241,10 @@ public final class CompassTrackingService {
         nearbyStructures.tick();
         if (extensions != null) extensions.tick();
         var due = tickSchedule.advance(distanceRefreshTicks());
+        if (extensions!=null) {
+            if(due.display())extensions.samplePlayers();
+            else if(due.maintenance())for(Player player:server.getOnlinePlayers())extensions.observe(player);
+        }
         if (due.maintenance()) runningSession().ifPresent(this::maintain);
         if (due.display()) runningSession().ifPresent(this::refreshDistanceDisplays);
         else if (due.keepAlive()) runningSession().ifPresent(this::keepDistanceDisplaysAlive);
@@ -1286,7 +1301,7 @@ public final class CompassTrackingService {
     }
 
     private void recordPosition(UUID playerId, Location location) {
-        if (location != null && location.getWorld() != null) {
+        if (location != null && location.getWorld() != null && runningSession().flatMap(value->value.participant(playerId)).isPresent()) {
             state.recordPosition(playerId, position(location));
         }
     }
@@ -1344,10 +1359,16 @@ public final class CompassTrackingService {
     boolean extensionMaySelect(Player player, boolean held) {
         GameSession session = runningSession().orElse(null);
         return session != null && state != null && state.sessionId().equals(session.id()) && session.isRunnerAlive(player.getUniqueId())
+                && (extensions==null||!extensions.overridden(player.getUniqueId()))
                 && !pendingPlayers.needsReset(player.getUniqueId()) && configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED)
                 && configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.TRACKING_COMPASS_USE,
                 player, player.getLocation(), held ? "tracking-selection" : "tracking-api")
                 && (!held || isCurrentCompass(heldCompass(player), session.id(), TrackingCompassKind.RUNNER));
+    }
+    boolean extensionMayControl(UUID id) {
+        var session=runningSession().orElse(null);if(session==null||state==null||session.participant(id).isEmpty()||session.isEliminatedParticipant(id))return false;
+        Player live=onlinePlayer(id);return live==null||!live.isDead()&&!pendingPlayers.needsReset(id)
+                &&configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.TRACKING_COMPASS_USE,live,live.getLocation(),"tracking-override");
     }
     com.caxture.manhuntuniversal.config.TrackingSettings extensionSettings() {
         return settings == null ? configuration.values().trackingSettings() : new com.caxture.manhuntuniversal.config.TrackingSettings(
@@ -1369,7 +1390,7 @@ public final class CompassTrackingService {
         invalidateStructureSearch(player); lastDisplays.remove(player);
     }
     void extensionRefreshRequested(UUID player) {
-        if(extensions!=null)extensions.selection(player).ifPresent(target->{
+        if(extensions!=null)extensions.effectiveTarget(player).ifPresent(target->{
             if(!extensions.registry.customLocator(target))extensionInvalidateNative(new com.caxture.manhuntuniversal.api.tracking.TrackingInvalidation(Optional.of(target),Optional.of(player),false));
         });
     }
@@ -1406,8 +1427,23 @@ public final class CompassTrackingService {
     Location extensionMovementReference(Player player,World world){return movementReference(player,world);}
     void extensionRefreshNow() { runningSession().ifPresent(this::tick); }
     void extensionDisplayNow() { runningSession().ifPresent(this::refreshDistanceDisplays); }
+    private TrackingDisplay overrideDisplay(Player player,Instant now,boolean allowSearch) {
+        UUID id=player.getUniqueId();
+        if(extensions.disabled(id))return new TrackingDisplay("tracking.actionbar.disabled",Map.of(),null,player.getWorld());
+        if(extensions.playerOverride(id)) {
+            var target=extensions.playerTarget(id).orElse(null);Location destination=null;
+            if(target!=null){var value=target.position();World world=server.getWorld(value.worldId());if(world!=null)destination=new Location(world,value.x(),value.y(),value.z());}
+            return locatedDisplay(player,target==null?"?":target.name(),destination,target==null?null:server.getWorld(target.position().worldId()),false,allowSearch);
+        }
+        if(allowSearch)extensions.maintain(player);
+        TrackingTargetId desired=state.runnerSelection(id);
+        if(allowSearch){TrackingTargetId previous=desiredTargets.put(id,desired);if(previous!=desired){invalidateStructureSearch(id);desiredTargets.put(id,desired);}}
+        return extensions.handles(id)?extendedDisplay(player,allowSearch):desired==TrackingTargetId.NONE
+                ?new TrackingDisplay("tracking.actionbar.not-found",Map.of("target","?","dimension",dimensionName(player,null)),null,player.getWorld())
+                :staticDisplay(player,desired,now,allowSearch);
+    }
     private TrackingDisplay extendedDisplay(Player player, boolean allowSearch) {
-        String id = extensions.selection(player.getUniqueId()).orElse("");
+        String id = extensions.effectiveTarget(player.getUniqueId()).orElse("");
         String name = extensions.name(player.getUniqueId(), id);
         var result = extensions.result(player.getUniqueId()).orElse(null);
         Location destination = result == null ? null : result.position().map(value -> {
@@ -1415,8 +1451,11 @@ public final class CompassTrackingService {
         }).orElse(null);
         World targetWorld = destination == null ? extensions.registry.definition(id).map(definition -> extensionOrigin(player, definition.world()))
                 .map(Location::getWorld).orElse(null) : destination.getWorld();
+        return locatedDisplay(player,name,destination,targetWorld,result==null,allowSearch);
+    }
+    private TrackingDisplay locatedDisplay(Player player,String name,Location destination,World targetWorld,boolean searching,boolean allowSearch) {
         Map<String, String> placeholders = Map.of("target", name, "dimension", dimensionName(player, targetWorld));
-        if (result == null) return new TrackingDisplay("tracking.actionbar.searching", placeholders, null, targetWorld);
+        if (searching) return new TrackingDisplay("tracking.actionbar.searching", placeholders, null, targetWorld);
         if (destination == null) return new TrackingDisplay("tracking.actionbar.not-found", placeholders, null, targetWorld);
         if (destination.getWorld().equals(player.getWorld())) return new TrackingDisplay("tracking.actionbar.same-dimension", Map.of(
                 "target", name, "dimension", dimensionName(player, targetWorld), "distance", Long.toString(TrackingPolicy.roundedDisplayDistance(position(player.getLocation()), position(destination))),
@@ -1429,14 +1468,22 @@ public final class CompassTrackingService {
         Player player = onlinePlayer(playerId); if (player == null || state == null) return Optional.empty();
         com.caxture.manhuntuniversal.api.tracking.TrackingStatus status = com.caxture.manhuntuniversal.api.tracking.TrackingStatus.IDLE;
         GameSession session = runningSession().orElse(null);
-        if (selection.isPresent() && (session == null || !session.isRunnerAlive(playerId)
-                || !configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED) || coreUseDenied.contains(playerId))) {
+        boolean forced=extensions!=null&&extensions.overridden(playerId);
+        if ((selection.isPresent()||forced) && (session == null || session.isEliminatedParticipant(playerId) || pendingPlayers.needsReset(playerId)
+                || (!forced&&(!session.isRunnerAlive(playerId)||!configuration.get(BooleanConfigKey.RUNNER_COMPASS_ENABLED))) || coreUseDenied.contains(playerId)
+                || forced&&extensions.disabled(playerId))) {
             return Optional.of(new com.caxture.manhuntuniversal.api.tracking.TrackingSnapshot(playerId, selection,
                     com.caxture.manhuntuniversal.api.tracking.TrackingStatus.DISABLED, Optional.empty(), Optional.empty(),
                     java.util.OptionalDouble.empty(), "", "Tracking is unavailable for this player", extensions == null ? 0 : extensions.registry.revision()));
         }
         Location destination = null; String source = "", detail = "";
-        if (extensions != null && extensions.handles(playerId)) {
+        if(extensions!=null&&extensions.playerOverride(playerId)) {
+            var target=extensions.playerTarget(playerId).orElse(null);
+            selection=target==null?Optional.empty():Optional.of("player:"+target.playerId());
+            if(target!=null){var value=target.position();World world=server.getWorld(value.worldId());if(world!=null)destination=new Location(world,value.x(),value.y(),value.z());}
+            status=destination==null?com.caxture.manhuntuniversal.api.tracking.TrackingStatus.NOT_FOUND:com.caxture.manhuntuniversal.api.tracking.TrackingStatus.FOUND;
+            source="core:player";
+        } else if (extensions != null && extensions.handles(playerId)) {
             var result = extensions.result(playerId).orElse(null);
             status = result == null ? com.caxture.manhuntuniversal.api.tracking.TrackingStatus.SEARCHING : switch (result.status()) {
                 case FOUND -> com.caxture.manhuntuniversal.api.tracking.TrackingStatus.FOUND;
@@ -1458,7 +1505,7 @@ public final class CompassTrackingService {
                     ? "core:blaze-spawner" : "core:structure";
         }
         TrackingDisplay display = lastDisplays.get(playerId);
-        Location guidance = destination != null && destination.getWorld().equals(player.getWorld()) ? destination
+        Location guidance = destination == null ? null : destination.getWorld().equals(player.getWorld()) ? destination
                 : display == null ? null : display.direction();
         Optional<com.caxture.manhuntuniversal.api.WorldPosition> logical = Optional.ofNullable(destination).map(ExtendedTrackingController::point);
         Optional<com.caxture.manhuntuniversal.api.WorldPosition> pointing = Optional.ofNullable(guidance).map(ExtendedTrackingController::point);

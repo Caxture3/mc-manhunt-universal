@@ -12,3 +12,7 @@ javac --release 21 -cp <original-api-1.0.0.jar> -d api/src/test/resources api/sr
 ```
 
 The test verifies old constructors/method calls still link, and a legacy implementation inherits the new optional default entrypoints without an `AbstractMethodError`.
+
+## API 1.1 tracking fixture
+
+`LegacyTrackingConsumer.class` was compiled with `javac --release 21` against the shipped 1.1.0 JAR (SHA-256 `c481e08416dd9d083cdeb620d4c08d7c2886dd13054cf96ecd40008ca7effe27`). Its SHA-256 is `9e65ff2aff967b89250a4eb7de51e23264e1b57d87bc919651dc7ed3d90f928d`. `Api12CompatibilityTest` loads this original bytecode and checks the new default control entry. Do not recompile against the newer SDK.

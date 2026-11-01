@@ -24,6 +24,9 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
     private final Supplier<Optional<MatchSnapshot>> match;
     private final Clock clock;
     final TrackingRegistryService registry;
+    final TrackingControlService control;
+    private final PlayerTrackingIndex players=new PlayerTrackingIndex(4096);
+    private final Map<UUID,PlayerTrackingCandidate> playerTargets=new HashMap<>();
     private final TrackingLocateCoordinator coordinator;
     private final DynamicTrackingSelectionPresenter menus;
     private final Map<UUID, String> selections = new HashMap<>();
@@ -31,6 +34,7 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
     Map<UUID,String> selectionSnapshot() { Map<UUID,String> saved=new HashMap<>(pendingRestores);saved.putAll(selections);return Map.copyOf(saved); }
     void restoreSelections(Map<UUID,String> saved) { pendingRestores.clear();pendingRestores.putAll(saved); }
     void restorePlayer(UUID player) {
+        if(overridden(player))return;
         String target=pendingRestores.remove(player);
         if(target!=null&&selection(player).isEmpty())registry.choose(player,target,registry.revision());
     }
@@ -45,6 +49,9 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
                                Supplier<Optional<MatchSnapshot>> match, Clock clock) {
         this.plugin = plugin; this.tracking = tracking; this.configuration = configuration; this.language = language; this.match = match; this.clock = clock;
         registry = new TrackingRegistryService(owned, this);
+        control = new TrackingControlService(owned,match,tracking::extensionMayControl,
+                id->registry.definition(id).isPresent(),registry::revision,this::controlChanged);
+        registry.installControl(control);
         coordinator = new TrackingLocateCoordinator(owned, System::nanoTime, this::current, this::completed);
         menus = new DynamicTrackingSelectionPresenter(clients, language, player -> tracking.extensionMaySelect(player, true),
                 (player, sessionId, authorization, revision, target) -> match.get().filter(value -> value.id().equals(sessionId)).isPresent()
@@ -72,29 +79,63 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
                 player.getWorld().getEnvironment().name().toLowerCase(Locale.ROOT), current, Instant.now(clock)));
     }
     @Override public boolean maySelect(UUID player) {
-        Player live = plugin.getServer().getPlayer(player); return live != null && tracking.extensionMaySelect(live, false);
+        Player live = plugin.getServer().getPlayer(player); return !overridden(player) && live != null && tracking.extensionMaySelect(live, false);
+    }
+    @Override public boolean overridden(UUID player) { return control.binding(player).isPresent(); }
+    Optional<String> effectiveTarget(UUID player) {
+        var binding=control.binding(player).orElse(null);
+        return binding==null?selection(player):binding.request().targetId();
+    }
+    boolean playerOverride(UUID player) { return control.binding(player).map(value->value.request().playerId().isPresent()||value.request().selector().isPresent()).orElse(false); }
+    boolean disabled(UUID player) { return control.binding(player).map(value->value.request().mode()==TrackingOverrideMode.DISABLED).orElse(false); }
+    Optional<PlayerTrackingCandidate> playerTarget(UUID player) {
+        return Optional.ofNullable(playerTargets.get(player)).filter(value->match.get().map(current->{
+            var participant=current.participants().get(value.playerId());return participant==null||!participant.eliminated();}).orElse(false));
+    }
+    void observe(Player player) { if(session!=null)players.observe(player.getUniqueId(),player.getName(),point(player.getLocation())); }
+    void samplePlayers() {
+        var current=match.get().filter(value->value.state()==MatchState.RUNNING).orElse(null);if(current==null)return;
+        // Seed restored participants without touching offline player files. Live observations win.
+        tracking.positionSnapshot().forEach((id,positions)->{var participant=current.participants().get(id);
+            if(participant!=null&&!positions.isEmpty()){var value=positions.getLast();players.observe(id,participant.name(),new WorldPosition(value.worldId(),value.x(),value.y(),value.z()));}});
+        Set<UUID> online=new HashSet<>();for(Player live:plugin.getServer().getOnlinePlayers()){observe(live);online.add(live.getUniqueId());}
+        var candidates=players.candidates(current,online).stream().filter(value->plugin.getServer().getWorld(value.position().worldId())!=null).toList();
+        for(UUID player:current.participants().keySet()) {
+            if(!playerOverride(player)||!tracking.extensionMayControl(player)){playerTargets.remove(player);continue;}
+            var viewer=viewer(player).orElse(null);if(viewer==null)continue;
+            var resolved=control.resolvePlayer(player,new PlayerTrackingContext(viewer,candidates));
+            if(resolved.isPresent())playerTargets.put(player,resolved.get());else playerTargets.remove(player);
+        }
+    }
+    private void controlChanged(UUID player) {
+        invalidatePlayer(player); playerTargets.remove(player);
+        tracking.extensionSelection(player,nativeTarget(effectiveTarget(player).orElse(null)));
+        // Never run inventory/provider work reentrantly inside the public mutation callback.
+        if(scheduled||!plugin.isEnabled())return;scheduled=true;
+        plugin.getServer().getScheduler().runTask(plugin,()->{scheduled=false;tracking.extensionRefreshNow();});
     }
     @Override public Optional<String> selection(UUID player) { return Optional.ofNullable(selections.get(player)); }
     @Override public void selection(UUID player, String target) {
         pendingRestores.remove(player);
         coordinator.cancel(player); queries.remove(player); announced.remove(player);
         if (target == null) selections.remove(player); else selections.put(player, target);
-        tracking.extensionSelection(player, nativeTarget(target));
+        if(!overridden(player))tracking.extensionSelection(player, nativeTarget(target));
     }
-    @Override public Optional<TrackingSnapshot> snapshot(UUID player) { return tracking.extensionSnapshot(player, selection(player)); }
+    @Override public Optional<TrackingSnapshot> snapshot(UUID player) { return tracking.extensionSnapshot(player, effectiveTarget(player)); }
     @Override public void refresh(UUID player) { Query query = queries.get(player); if (query != null) query.refresh = true; tracking.extensionRefreshRequested(player); }
     @Override public void invalidate(TrackingInvalidation scope) {
         tracking.extensionInvalidateNative(scope);
         coordinator.invalidate(request -> scope.playerId().map(request.playerId()::equals).orElse(true)
                 && scope.targetId().map(request.targetId()::equals).orElse(true));
         for (UUID player : List.copyOf(queries.keySet())) if (scope.playerId().map(player::equals).orElse(true)
-                && scope.targetId().map(id -> id.equals(selections.get(player))).orElse(true)) {
+                && scope.targetId().map(id -> effectiveTarget(player).filter(id::equals).isPresent()).orElse(true)) {
             Query query = queries.get(player); query.pending = false; query.refresh = true;
             // Revision changes invalidate a result immediately; ordinary refresh still obeys cooldown.
             if (query.request.targetRevision() != registry.revision()) queries.remove(player);
         }
     }
     @Override public void catalogChanged() {
+        control.catalogChanged();
         for (UUID player : List.copyOf(selections.keySet())) if (registry.definition(selections.get(player)).isEmpty()) selection(player, null);
         if (scheduled || !plugin.isEnabled()) return; scheduled = true;
         plugin.getServer().getScheduler().runTask(plugin, () -> { scheduled = false; advance(TrackingChange.Source.REGISTRATION); tracking.extensionRefreshNow(); });
@@ -108,6 +149,7 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
         for (Player player : plugin.getServer().getOnlinePlayers()) if (viewer(player.getUniqueId()).isPresent()) {restorePlayer(player.getUniqueId());cacheMenu(player, source);}
     }
     private void cacheMenu(Player player, TrackingChange.Source source) {
+        if(overridden(player.getUniqueId())){menus.close(player);return;}
         registry.menu(player.getUniqueId(), source).ifPresent(menu -> {
             visible.put(player.getUniqueId(), !menu.options().isEmpty()); menus.update(player, menu);
         });
@@ -122,17 +164,17 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
     void invalidatePlayer(UUID player) { coordinator.cancel(player); queries.remove(player); announced.remove(player);
         Player live = plugin.getServer().getPlayer(player); if (live != null) menus.close(live); else menus.forget(player); }
     void leave(UUID player) { invalidatePlayer(player); registry.forget(player); visible.remove(player); }
-    void end() { coordinator.clear(); menus.clear(plugin.getServer()); queries.clear(); selections.clear(); pendingRestores.clear();visible.clear(); announced.clear(); }
+    void end() { control.clear();players.clear();playerTargets.clear();coordinator.clear(); menus.clear(plugin.getServer()); queries.clear(); selections.clear(); pendingRestores.clear();visible.clear(); announced.clear(); }
     void unload(UUID world) { coordinator.invalidate(request -> request.origin().worldId().equals(world) || request.viewer().worldId().equals(world));
         queries.entrySet().removeIf(entry -> entry.getValue().request.origin().worldId().equals(world) || entry.getValue().request.viewer().worldId().equals(world)); }
     void tick() { coordinator.tick(); }
     boolean handles(UUID player) {
-        String target = selections.get(player); Query query = queries.get(player);
+        String target = effectiveTarget(player).orElse(null); Query query = queries.get(player);
         return target != null && registry.customLocator(target) && (query == null || query.result == null || query.result.status() != LocateResult.Status.USE_CORE);
     }
     Optional<LocateResult> result(UUID player) { Query query = queries.get(player); return query == null ? Optional.empty() : Optional.ofNullable(query.result); }
     void maintain(Player player) {
-        String target = selections.get(player.getUniqueId()); if (target == null || !registry.customLocator(target)) return;
+        String target = effectiveTarget(player.getUniqueId()).orElse(null); if (target == null || !registry.customLocator(target)) return;
         var definition = registry.definition(target).orElse(null); if (definition == null) return;
         Location origin = tracking.extensionOrigin(player, definition.world()); Query old = queries.get(player.getUniqueId());
         if (origin == null) {
@@ -157,11 +199,11 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
     private boolean current(LocateRequest request) {
         Query query = queries.get(request.playerId());
         return query != null && query.request.requestVersion() == request.requestVersion() && request.targetRevision() == registry.revision()
-                && selection(request.playerId()).filter(request.targetId()::equals).isPresent()
+                && effectiveTarget(request.playerId()).filter(request.targetId()::equals).isPresent()
                 && match.get().filter(value -> value.id().equals(request.sessionId()) && value.state() == MatchState.RUNNING).isPresent()
-                && maySelect(request.playerId()) && plugin.getServer().getWorld(request.origin().worldId()) != null
+                && (overridden(request.playerId())?tracking.extensionMayControl(request.playerId()):maySelect(request.playerId())) && plugin.getServer().getWorld(request.origin().worldId()) != null
                 && viewer(request.playerId()).filter(value->value.position().worldId().equals(request.viewer().worldId())).isPresent()
-                && registry.availability(request.targetId(), request.playerId(), TrackingChange.Source.PLAYER_STATE).selectable();
+                && (overridden(request.playerId())||registry.availability(request.targetId(), request.playerId(), TrackingChange.Source.PLAYER_STATE).selectable());
     }
     private void completed(TrackingLocateCoordinator.Completion completion) {
         Query query = queries.get(completion.request().playerId()); if (query == null) return;

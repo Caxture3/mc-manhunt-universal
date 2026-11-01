@@ -61,6 +61,8 @@ public final class OwnedRegistry {
         List.copyOf(handles).stream().filter(handle -> handle.owner == owner).forEach(Handle::dispose);
     }
     public void clear() { requireThread(); List.copyOf(handles).forEach(Handle::dispose); }
+    /** Internal lifecycle retirement during an already guarded core mutation. */
+    public void retire(ExtensionHandle handle) { requireThread(); if (handle instanceof OwnedRegistry.Handle child && handles.contains(child)) child.dispose(); }
 
     private final class Handle implements ExtensionHandle {
         private final ExtensionRegistration owner;

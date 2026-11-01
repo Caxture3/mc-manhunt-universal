@@ -14,5 +14,7 @@ public enum ControlDomain {
     /** victory. */
     VICTORY,
     /** Explicit ownership of role visibility rules used by presentation extensions. */
-    ROLE_VISIBILITY
+    ROLE_VISIBILITY,
+    /** Exclusive forced tracking for all participants. @since 1.2 */
+    TRACKING
 }

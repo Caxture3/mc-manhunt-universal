@@ -17,6 +17,7 @@ class TrackingCatalogTest {
     private String selected;
     private TeamRole role = TeamRole.RUNNER;
     private boolean eliminated;
+    private boolean overridden;
     private final TrackingRegistryService.Runtime runtime = new TrackingRegistryService.Runtime() {
         public Optional<TrackingViewerContext> viewer(UUID id) {
             if (!id.equals(player)) return Optional.empty();
@@ -24,7 +25,8 @@ class TrackingCatalogTest {
                     Map.of(player, new ParticipantSnapshot(player, "Alex", role, eliminated)), Optional.empty());
             return Optional.of(new TrackingViewerContext(player, "en_us", new WorldPosition(world, 0, 70, 0), "overworld", Optional.of(match), Instant.EPOCH));
         }
-        public boolean maySelect(UUID id) { return true; }
+        public boolean maySelect(UUID id) { return !overridden; }
+        public boolean overridden(UUID id) { return overridden; }
         public Optional<String> selection(UUID id) { return Optional.ofNullable(selected); }
         public void selection(UUID id, String target) { selected = target; }
         public Optional<TrackingSnapshot> snapshot(UUID id) { return Optional.empty(); }
@@ -72,5 +74,15 @@ class TrackingCatalogTest {
         registry.register(owner,target("test:checkpoint"));
         registry.availability(owner,"test:checkpoint",1,viewer->{registry.menu(viewer.playerId());return TargetAvailability.available();});
         assertEquals(1,registry.menu(player).orElseThrow().options().size());
+    }
+    @Test void overrideLocksManualWritesAndDoesNotEraseTheManualSelectionWhenMenusReevaluate(){
+        registry.register(owner,target("test:checkpoint"));registry.select(mutation(-1),"test:checkpoint");
+        overridden=true;
+        var policy=registry.availability(owner,"test:checkpoint",2,viewer->TargetAvailability.hidden()).value().orElseThrow();
+        registry.menu(player);assertEquals("test:checkpoint",selected);
+        assertEquals(OperationStatus.PLAYER_UNAVAILABLE,registry.clear(mutation(-1)).status());
+        assertFalse(registry.choose(player,"test:checkpoint",registry.revision()));
+        policy.close();overridden=false;registry.menu(player);assertEquals("test:checkpoint",selected);
+        assertTrue(registry.clear(mutation(-1)).successful());
     }
 }

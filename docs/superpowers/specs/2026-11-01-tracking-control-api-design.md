@@ -1,0 +1,13 @@
+# Tracking control API 1.2
+
+The extension SDK becomes 1.2.0; product 1.0.0 and protocol 3 remain unchanged. Existing API 1.0/1.1 callers retain their contracts. All public DTOs remain platform independent Java 21.
+
+An extension owning the exclusive TRACKING domain can override any uneliminated RUNNING participant, including an offline participant. DEFAULT restores the role's normal behavior and its separately retained manual selection. TARGET uses a catalog ID, a fixed player UUID, or a synchronous live player selector. DISABLED retains a bound compass without meaningful direction. Overrides bypass role compass switches and catalog menu availability/unlock rules, but never elimination, pending reset or core feature takeover. Forced targets need not appear in menus; the manual selection API/menu is unavailable while overridden.
+
+Writes require the opaque owner, match UUID, match revision and a per-player control revision. Catalog requests can also check directory revision. Replacement invalidates previous work; closing an old handle cannot clear its replacement. Owner disable, role changes, elimination and session cleanup revoke overrides. Viewer disconnect retains its override for reconnection. Extension callbacks and overrides are process-local, not serialized in runtime snapshots.
+
+Player targets include nonparticipants. Online positions are observed without disk access; offline targets use the last known position, including core's restored participant positions. Eliminated participants are excluded even if explicitly requested. Unknown positions yield NOT_FOUND, never another arbitrary target. A live selector receives an immutable candidate snapshot and returns an optional UUID; the core revalidates the answer. Callbacks run on the main thread, are guarded against reentrant writes, and must be fast. They run at the configured distance refresh cadence, independently of structure locate cooldowns. Display-only code reads results; it never invokes callbacks or starts native searches. Cross-world guidance reuses budgeted portal searching during maintenance.
+
+Separate manual selection and override snapshots make restoration explicit. Existing catalog locators, precise caches, real-work concurrency limits and stale completion guards remain in use. Both roles use the same forced tracking implementation. No Fabric changes or additional client mod are required.
+
+Validation covers ownership, stale match/control/catalog revisions, replacement cleanup, lifecycle, both roles, hidden/locked targets, offline/outsider/eliminated targets, selector errors/reentry and cadence. Independently build both Minecraft variants, inspect four product and six SDK jars/checksums, and distinguish compile verification from unperformed game tests.
