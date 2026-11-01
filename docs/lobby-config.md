@@ -4,7 +4,7 @@
 
 ## 选队与命令
 
-根命令从旧名称替换为 `/mhu`，无旧别名。所有玩家可执行 `/mhu join hunter|runner|random`；其余管理操作仍使用 `randomanhunt.admin`。
+根命令从旧名称替换为 `/mhu`，无旧别名。所有玩家可执行 `/mhu join hunter|runner|random`；其余管理操作仍使用 `manhuntuniversal.admin`。
 
 选队仅在没有活动会话时开放，倒计时开始即锁定本局名单和角色。初始未选队等于 random。明确选择 runner 的玩家优先占用名额，明确选择 hunter 的玩家不参与抽签；剩余名额只在 random 玩家中均匀抽取，不足时拒绝开局。仍至少保留一名猎人。
 

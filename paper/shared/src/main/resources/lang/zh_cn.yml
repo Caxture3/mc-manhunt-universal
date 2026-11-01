@@ -5,8 +5,24 @@ identity:
 command:
   busy: "{prefix}§e对局正在处理状态变更，请稍后重试。"
   no-permission: "{prefix}§c你没有权限执行该指令。"
-  usage: "{prefix}§e用法：/mhu <join [hunter|runner|random]|start [1-60秒]|status|stop|config>"
+  usage: "{prefix}§e用法：/mhu <join [hunter|runner|random]|start [1-60秒]|status|stop|config|debug>"
   unknown: "{prefix}§c未知的子指令。"
+debug:
+  usage: "{prefix}§e用法：/mhu debug <role-reshuffle|role-set <玩家> <runner|hunter>>"
+  unknown-feature: "{prefix}§c未知调试指令：{feature}"
+  no-running-game: "{prefix}§c只能在正式游戏进行时调试角色。"
+  operation-rejected: "{prefix}§c无法修改角色：双方须各有未淘汰成员，随机重排还需有可变更的身份组合。"
+  operation-cancelled: "{prefix}§e角色修改已被扩展取消。"
+  operation-stale: "{prefix}§e游戏状态已变化，请重新执行指令。"
+  player:
+    not-participant: "{prefix}§c{player} 不在本局参赛名单中。"
+    eliminated: "{prefix}§c{player} 已被淘汰，请先显式复活再修改角色。"
+    unavailable: "{prefix}§c需要换角的在线玩家仍处于死亡或等待开局重置状态。"
+  role:
+    invalid: "{prefix}§c未知角色：{role}，请使用 runner 或 hunter。"
+    reshuffled: "{prefix}§a角色已随机重排，未淘汰速通者人数保持不变。"
+    set: "{prefix}§a已将 {player} 的角色设为 {role}。"
+    set-hidden: "{prefix}§a角色已更新，身份分配继续隐藏。"
 game:
   roles:
     changed-title: "§e角色已重新分配"

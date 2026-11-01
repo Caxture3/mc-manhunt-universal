@@ -111,6 +111,7 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
             @Override public boolean stop() { return active.stopAdmin(); }
             @Override public boolean available(UUID id) { return active.playerAvailableForRoleChange(id); }
             @Override public void rolesChanged(GameSession session) { active.rolesChanged(session); }
+            @Override public void revealRoles(GameSession session) { active.revealCurrentRoles(session); }
             @Override public boolean eliminate(UUID session, UUID id) { return active.eliminateForApi(session, id); }
             @Override public boolean revive(UUID session, UUID id) { return active.reviveForApi(session, id); }
             @Override public boolean finish(UUID session, GameWinner winner, String reason) {
@@ -254,10 +255,15 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         if (context.sessionId() == null || context.expectedRevision() < -1 || context.reason() == null) {
             return result(OperationStatus.INVALID_ARGUMENT, "Invalid mutation context");
         }
+        return matchFailure(context.sessionId(),context.expectedRevision(),running);
+    }
+
+    private OperationResult matchFailure(UUID sessionId,long expectedRevision,boolean running) {
+        if(sessionId==null||expectedRevision < -1)return result(OperationStatus.INVALID_ARGUMENT,"Invalid session context");
         GameSession session = manager.activeSession().orElse(null);
         if (session == null) return result(OperationStatus.NO_ACTIVE_MATCH, "No active match");
-        if (!session.id().equals(context.sessionId())) return result(OperationStatus.STALE_SESSION, "Session changed");
-        if (context.expectedRevision() >= 0 && context.expectedRevision() != session.revision()) {
+        if (!session.id().equals(sessionId)) return result(OperationStatus.STALE_SESSION, "Session changed");
+        if (expectedRevision >= 0 && expectedRevision != session.revision()) {
             return result(OperationStatus.STALE_REVISION, "Revision changed");
         }
         if (session.state() == SessionState.SETTLING || running && session.state() != SessionState.RUNNING) {
@@ -284,6 +290,12 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
     }
 
     private OperationResult assignRoles(MutationContext context, Map<UUID, TeamRole> supplied) {
+        return commitRoles(supplied,new ChangeSource(context.extension().id(),context.reason()),
+                ()->contextFailure(context,ControlDomain.ROLES,true),false);
+    }
+
+    private OperationResult commitRoles(Map<UUID,TeamRole> supplied,ChangeSource source,
+                                        Supplier<OperationResult> revalidate,boolean revealUnchanged) {
         if (supplied == null || supplied.entrySet().stream().anyMatch(entry -> entry.getKey() == null || entry.getValue() == null)) {
             return result(OperationStatus.INVALID_ASSIGNMENT, "Complete nonnull assignments are required");
         }
@@ -293,13 +305,19 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         if (failure != null) return failure;
         boolean changed = session.participants().stream().anyMatch(player ->
                 !session.roleOf(player.id()).orElseThrow().name().equals(proposed.get(player.id()).name()));
-        if (!changed) return result(OperationStatus.OK, "Roles already match the assignment");
+        if (!changed) {
+            if(revealUnchanged)try { runtime.revealRoles(session); }
+            catch(RuntimeException|LinkageError error) {
+                logger.log(Level.WARNING,"Cannot replay role presentation",error);
+                return result(OperationStatus.SERVICE_UNAVAILABLE,"Role presentation failed");
+            }
+            return result(OperationStatus.OK, "Roles already match the assignment");
+        }
         MatchSnapshot before = MatchSnapshots.of(session);
-        ChangeSource source = new ChangeSource(context.extension().id(), context.reason());
         RolesChangingEvent changing = new RolesChangingEvent(before, proposed, source);
         fire(changing);
         if (changing.isCancelled()) return result(OperationStatus.CANCELLED, "Role change cancelled");
-        failure = contextFailure(context, ControlDomain.ROLES, true);
+        failure = revalidate.get();
         if (failure != null) return failure;
         if (manager.activeSession().orElse(null) != session || session.revision() != before.revision()) {
             return result(OperationStatus.STALE_REVISION, "Match changed during the role event");
@@ -354,6 +372,11 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
     }
 
     private OperationResult rerollRoles(MutationContext context, int runnerCount) {
+        return rerollRoles(runnerCount,false,assignment->assignRoles(context,assignment));
+    }
+
+    private OperationResult rerollRoles(int runnerCount,boolean requireDifferent,
+                                        java.util.function.Function<Map<UUID,TeamRole>,OperationResult> commit) {
         if (runnerCount < 0) return result(OperationStatus.INVALID_ARGUMENT, "Runner count must be nonnegative");
         GameSession session = manager.activeSession().orElseThrow();
         Map<UUID, TeamRole> assignment = new LinkedHashMap<>();
@@ -372,9 +395,36 @@ public final class PaperExtensionService implements PaperManhuntUniversalApi, Ga
         if (selectedCount < 0 || selectedCount > candidates.size()) {
             return result(OperationStatus.INVALID_ASSIGNMENT, "Runner count conflicts with fixed participants");
         }
-        Set<UUID> runners = Set.copyOf(manager.randomRunners(candidates, selectedCount));
+        Set<UUID> runners = new LinkedHashSet<>(manager.randomRunners(candidates, selectedCount));
+        if(requireDifferent&&candidates.stream().allMatch(id->runners.contains(id)==session.isRunnerAlive(id))) {
+            List<UUID> oldRunners=candidates.stream().filter(session::isRunnerAlive).toList();
+            List<UUID> oldHunters=candidates.stream().filter(id->!session.isRunnerAlive(id)).toList();
+            if(oldRunners.isEmpty()||oldHunters.isEmpty())return result(OperationStatus.INVALID_ASSIGNMENT,"No eligible alternative role assignment");
+            runners.remove(manager.randomRunners(oldRunners,1).getFirst());
+            runners.add(manager.randomRunners(oldHunters,1).getFirst());
+        }
         candidates.forEach(id -> assignment.put(id, runners.contains(id) ? TeamRole.RUNNER : TeamRole.HUNTER));
-        return assignRoles(context, assignment);
+        return commit.apply(assignment);
+    }
+
+    private OperationResult debugRoles(UUID sessionId,long revision,Supplier<OperationResult> action) {
+        OperationStatus denied=writeGate();if(denied!=null)return result(denied,denied.name());
+        return inMutation(()->{OperationResult failure=matchFailure(sessionId,revision,true);return failure==null?action.get():failure;});
+    }
+    @Override public OperationResult debugSetRole(UUID sessionId,long revision,UUID playerId,TeamRole role) {
+        return debugRoles(sessionId,revision,()->{
+            if(role==null)return result(OperationStatus.INVALID_ARGUMENT,"Role required");
+            GameSession session=manager.activeSession().orElseThrow();
+            OperationResult failure=participantFailure(session,playerId,false);if(failure!=null)return failure;
+            Map<UUID,TeamRole> assignment=new LinkedHashMap<>();
+            session.participants().forEach(player->assignment.put(player.id(),TeamRole.valueOf(session.roleOf(player.id()).orElseThrow().name())));
+            assignment.put(playerId,role);
+            return commitRoles(assignment,new ChangeSource("core:debug","role-set"),()->matchFailure(sessionId,revision,true),true);
+        });
+    }
+    @Override public OperationResult debugReshuffleRoles(UUID sessionId,long revision) {
+        return debugRoles(sessionId,revision,()->rerollRoles(manager.activeSession().orElseThrow().livingRunnerIds().size(),true,
+                assignment->commitRoles(assignment,new ChangeSource("core:debug","role-reshuffle"),()->matchFailure(sessionId,revision,true),false)));
     }
 
     @Override public boolean preparing(GameSession session, int seconds) {

@@ -14,6 +14,12 @@ public interface GameExtensionHooks {
 
     default <T> T inMutation(Supplier<T> action) { return action.get(); }
     default boolean mutationActive() { return false; }
+    default com.caxture.manhuntuniversal.api.OperationResult debugSetRole(UUID sessionId,long revision,UUID playerId,com.caxture.manhuntuniversal.api.TeamRole role) {
+        return new com.caxture.manhuntuniversal.api.OperationResult(com.caxture.manhuntuniversal.api.OperationStatus.SERVICE_UNAVAILABLE,"Role service unavailable",Optional.empty());
+    }
+    default com.caxture.manhuntuniversal.api.OperationResult debugReshuffleRoles(UUID sessionId,long revision) {
+        return new com.caxture.manhuntuniversal.api.OperationResult(com.caxture.manhuntuniversal.api.OperationStatus.SERVICE_UNAVAILABLE,"Role service unavailable",Optional.empty());
+    }
     default boolean preparing(GameSession session, int countdownSeconds) { return true; }
     default void countdown(GameSession session, int countdownSeconds) {}
     default void started(GameSession session) {}

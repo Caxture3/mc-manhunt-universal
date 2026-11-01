@@ -309,6 +309,10 @@ public final class ActiveGameCoordinator {
             if (player != null && player.isOnline()) detectTargetEnd(player);
         });
     }
+    public void revealCurrentRoles(GameSession session) {
+        requireRunningSession(session);
+        presentation.showRolesChanged(session);
+    }
 
     private void requireRunningSession(GameSession session) {
         if (currentSession(session.id()).orElse(null) != session || session.state() != SessionState.RUNNING) {

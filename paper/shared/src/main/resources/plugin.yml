@@ -8,6 +8,6 @@ commands:
     description: Controls Manhunt games.
     usage: /mhu
 permissions:
-  randomanhunt.admin:
+  manhuntuniversal.admin:
     default: op
 

@@ -12,6 +12,7 @@ interface ExtensionRuntime {
     boolean stop();
     boolean available(UUID playerId);
     void rolesChanged(GameSession session);
+    default void revealRoles(GameSession session) { }
     boolean eliminate(UUID sessionId, UUID playerId);
     boolean revive(UUID sessionId, UUID playerId);
     boolean finish(UUID sessionId, GameWinner winner, String reason);

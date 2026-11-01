@@ -11,7 +11,7 @@
 根命令为 `/mhu`。
 
 - `/mhu join hunter|runner|random`：所有玩家均可选队，random 清除明确选择；不带队伍时显示可点击提示。
-- `/mhu start [秒数]`、`status`、`stop`、`config [key] [value]`：需要 `randomanhunt.admin`，默认 OP。`status` 显示本局参与者、时间和固定身份名单。
+- `/mhu start [秒数]`、`status`、`stop`、`config [key] [value]`、`debug`：需要 `manhuntuniversal.admin`，默认 OP。`status` 显示本局参与者、时间和固定身份名单。
 
 速通者预约满额时拒绝新选择并保留原队伍；重复选择不改变顺序。空闲时降低 `runner-count` 并成功保存后，从最后加入者开始将超额选择恢复为随机。倒计时或运行中修改只影响下一局，不清除预约或触发容量提示。退出会清空该玩家的选队；结算、停止或倒计时取消后保留在线玩家的明确选择与顺序，并恢复预览颜色。开始倒计时后不允许改队，也不会因配置变化或离线而重分配本局角色。
 
@@ -59,6 +59,8 @@
 时运、烈焰棒和交易优化对正式游戏期间的所有玩家生效，空闲和倒计时不生效。详见[优化配置与概率说明](docs/optional-optimizations.md)。
 
 `disable-piglin-brutes=false` 可在正式游戏中禁止猪灵蛮兵生成并移除现存蛮兵，普通猪灵不受影响。正常关服/重启会通过 `runtime-state.yml` 保存和恢复当前游戏；停服期间暂停计时，RUNNING 恢复不再重置玩家。选队只在同次运行中跨对局保留，退出仍清除。详见[续局与蛮兵配置说明](docs/runtime-continuity.md)。
+
+调试角色可用 `/mhu debug role-reshuffle` 和 `/mhu debug role-set <玩家> <runner|hunter>`，仅正式游戏接受，支持离线参与者；详见[角色调试指令](docs/role-debug-commands.md)。管理权限现仅为 `manhuntuniversal.admin`；已有权限配置需手动迁移旧授权。
 
 ## 版本矩阵
 
@@ -120,16 +122,16 @@ docs/                   使用说明、设计与验证记录
 
 构建后在各版本模块的 `build/libs/` 中取得部署 JAR。
 
-| 模块 | 部署产物（当前版本 0.2.0） |
+| 模块 | 部署产物（当前版本 1.0.0） |
 | --- | --- |
-| Paper 1.21.11 | `paper/1.21.11/build/libs/manhunt-universal-paper-mc1.21.11-0.2.0.jar` |
-| Paper 26.3 | `paper/26.3/build/libs/manhunt-universal-paper-mc26.3-0.2.0.jar` |
-| Fabric 1.21.11 | `fabric/1.21.11/build/libs/manhunt-universal-fabric-mc1.21.11-0.2.0.jar` |
-| Fabric 26.3 | `fabric/26.3/build/libs/manhunt-universal-fabric-mc26.3-0.2.0.jar` |
+| Paper 1.21.11 | `paper/1.21.11/build/libs/manhunt-universal-paper-mc1.21.11-1.0.0.jar` |
+| Paper 26.3 | `paper/26.3/build/libs/manhunt-universal-paper-mc26.3-1.0.0.jar` |
+| Fabric 1.21.11 | `fabric/1.21.11/build/libs/manhunt-universal-fabric-mc1.21.11-1.0.0.jar` |
+| Fabric 26.3 | `fabric/26.3/build/libs/manhunt-universal-fabric-mc26.3-1.0.0.jar` |
 
 Paper JAR 放到对应版本服务器的 `plugins/`；Fabric JAR 放到对应版本客户端的 `mods/`，并安装 Fabric Loader 和对应版本 Fabric API。不要安装 `-sources.jar` 或 `-dev.jar`，也不需要单独安装 `common`、`protocol` JAR。
 
-这四个产物分别面向对应游戏版本。插件和模组显示名为 `ManhuntUniversal`，Java 根包为 `com.caxture.manhuntuniversal`。Fabric Mod ID、资源命名空间、协议频道和绑定指南针 PDC 命名空间继续保留兼容标识 `randomanhunt`；管理权限为 `randomanhunt.admin`。客户端只安装对应版本的一份配套模组。
+这四个产物分别面向对应游戏版本。插件和模组显示名为 `ManhuntUniversal`，Java 根包为 `com.caxture.manhuntuniversal`。Fabric Mod ID、资源命名空间、协议频道和绑定指南针 PDC 命名空间继续保留兼容标识 `randomanhunt`；管理权限为 `manhuntuniversal.admin`。客户端只安装对应版本的一份配套模组。
 
 聊天前缀按客户端语言显示为 `穹猎追杀` / `Manhunt Universal`。升级不会自动改写 `plugins/ManhuntUniversal/lang/` 下的旧语言文件；已有服务器请按 [语言更新说明](docs/lobby-config.md) 手动更新相关条目。
 

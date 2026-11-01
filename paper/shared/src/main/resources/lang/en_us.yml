@@ -5,8 +5,24 @@ identity:
 command:
   busy: "{prefix}§eA match state change is in progress; please try again shortly."
   no-permission: "{prefix}§cYou do not have permission to use this command."
-  usage: "{prefix}§eUsage: /mhu <join [hunter|runner|random]|start [1-60 seconds]|status|stop|config>"
+  usage: "{prefix}§eUsage: /mhu <join [hunter|runner|random]|start [1-60 seconds]|status|stop|config|debug>"
   unknown: "{prefix}§cUnknown subcommand."
+debug:
+  usage: "{prefix}§eUsage: /mhu debug <role-reshuffle|role-set <player> <runner|hunter>>"
+  unknown-feature: "{prefix}§cUnknown debug command: {feature}"
+  no-running-game: "{prefix}§cRole debugging requires a running game."
+  operation-rejected: "{prefix}§cRole change rejected: both teams need an uneliminated member, and a reshuffle needs an eligible alternative assignment."
+  operation-cancelled: "{prefix}§eAn extension cancelled the role change."
+  operation-stale: "{prefix}§eThe game changed before the operation completed; try again."
+  player:
+    not-participant: "{prefix}§c{player} is not in this game's participant roster."
+    eliminated: "{prefix}§c{player} is eliminated; revive them explicitly before changing their role."
+    unavailable: "{prefix}§cAn online player whose role would change is dead or awaiting the start reset."
+  role:
+    invalid: "{prefix}§cUnknown role: {role}. Use runner or hunter."
+    reshuffled: "{prefix}§aRoles reshuffled; the speedrunner count is unchanged."
+    set: "{prefix}§aSet {player}'s role to {role}."
+    set-hidden: "{prefix}§aRole updated; role assignments remain hidden."
 game:
   roles:
     changed-title: "§eRoles Reassigned"

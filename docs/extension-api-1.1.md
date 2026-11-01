@@ -1,6 +1,6 @@
 # 扩展 API 1.1 使用指南
 
-SDK 版本为 **1.1.0**，插件与 Fabric 模组版本为 **0.2.0**。API 1.0 的对局、角色、淘汰、胜负策略和事件仍可用，原有二进制调用保留。扩展通过 Bukkit `ServicesManager` 获取 `PaperManhuntUniversalApi`，检查 `apiVersion()` 的主版本和所需 `capabilities()`，再注册插件绑定的 `ExtensionRegistration`。基础依赖和角色轮换示例见[原有接口指南](extension-api.md)。
+SDK 版本为 **1.1.0**，插件与 Fabric 模组版本为 **1.0.0**。API 1.0 的对局、角色、淘汰、胜负策略和事件仍可用，原有二进制调用保留。扩展通过 Bukkit `ServicesManager` 获取 `PaperManhuntUniversalApi`，检查 `apiVersion()` 的主版本和所需 `capabilities()`，再注册插件绑定的 `ExtensionRegistration`。基础依赖和角色轮换示例见[原有接口指南](extension-api.md)。
 
 扩展可以注册服务端追踪目标，直接出现在配套 Fabric 模组与原版 Paper Dialog 中。玩家只需更新本项目的配套模组，无需安装该扩展的额外 Fabric 模组。
 

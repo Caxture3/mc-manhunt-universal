@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 
 public final class MhuCommand implements CommandExecutor, TabCompleter {
-    public static final String ADMIN_PERMISSION = "randomanhunt.admin";
+    public static final String ADMIN_PERMISSION = "manhuntuniversal.admin";
 
     private final GameManager gameManager;
     private final GameStartCoordinator gameStart;
@@ -43,6 +43,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
     private final MatchPresentation presentation;
     private final Clock clock;
     private final TeamSelectionPresenter teamPresenter;
+    private final DebugCommandHandler debugCommands;
     private RegistryConfigCommands registryCommands;
 
     public void configurationRegistry(com.caxture.manhuntuniversal.extension.config.ConfigurationRegistryService registry) {
@@ -67,6 +68,8 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         this.presentation = presentation;
         this.clock = clock;
         this.teamPresenter = teamPresenter;
+        this.debugCommands=new DebugCommandHandler(gameManager,activeGame::extensionHooks,
+                ()->configuration.get(BooleanConfigKey.HIDE_ROLE_ASSIGNMENTS),language);
     }
 
     @Override
@@ -94,6 +97,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             case "status" -> status(sender, args);
             case "stop" -> stop(sender, args);
             case "config" -> config(sender, args);
+            case "debug" -> debugCommands.handle(sender,args);
             default -> language.send(sender, "command.unknown");
         }
         return true;
@@ -323,12 +327,13 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
             String[] args
     ) {
         boolean admin = CommandAccessPolicy.adminAllowed(sender.hasPermission(ADMIN_PERMISSION));
+        if(args.length>=2&&args[0].equalsIgnoreCase("debug"))return debugCommands.tabComplete(sender,args);
         if (registryCommands != null && admin && args.length >= 2 && args[0].equalsIgnoreCase("config"))
             return registryCommands.complete(args);
         List<String> candidates = new ArrayList<>();
         if (args.length == 1) {
             if (sender instanceof Player && !gameManager.teamSelections().forcedRandom()) candidates.add("join");
-            if (admin) candidates.addAll(List.of("start", "status", "stop", "config"));
+            if (admin) candidates.addAll(List.of("start", "status", "stop", "config", "debug"));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("join") && sender instanceof Player
                 && !gameManager.teamSelections().forcedRandom()) {
             candidates.addAll(List.of("hunter", "runner", "random"));

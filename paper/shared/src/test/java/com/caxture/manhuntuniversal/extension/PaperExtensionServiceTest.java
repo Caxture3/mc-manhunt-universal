@@ -31,6 +31,53 @@ import java.util.logging.Logger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PaperExtensionServiceTest {
+    @Test void coreDebugChangesOnlyTheRequestedOfflinePlayerAndRetainsTheExtensionOwner() {
+        Harness h=new Harness();var owner=h.register("mode",Set.of(ControlDomain.ROLES));h.offline.add(C);
+        var result=h.service.debugSetRole(h.session.id(),h.session.revision(),C,TeamRole.RUNNER);
+        assertTrue(result.successful());assertEquals(Set.of(A,B,C),new HashSet<>(h.session.runnerIds()));assertTrue(owner.active());
+        assertEquals(2,h.session.settings().runnerCount());assertEquals(TeamPreference.RUNNER,h.manager.teamSelections().preferenceOf(A));
+        var changing=(RolesChangingEvent)h.events.stream().filter(RolesChangingEvent.class::isInstance).findFirst().orElseThrow();
+        assertEquals("core:debug",changing.getSource().extensionId());
+        assertEquals(OperationStatus.OK,h.service.roles().assign(h.context(owner),h.original()).status());
+    }
+
+    @Test void coreDebugCannotRemoveTheLastLivingTeamOrChangeAnEliminatedOrUnreadyPlayer() {
+        Harness h=new Harness();assertTrue(h.service.debugSetRole(h.session.id(),h.session.revision(),A,TeamRole.HUNTER).successful());
+        var before=h.snapshot();assertEquals(OperationStatus.INVALID_ASSIGNMENT,h.service.debugSetRole(h.session.id(),h.session.revision(),B,TeamRole.HUNTER).status());assertEquals(before,h.snapshot());
+        h.unavailable.add(C);assertEquals(OperationStatus.PLAYER_UNAVAILABLE,h.service.debugSetRole(h.session.id(),h.session.revision(),C,TeamRole.RUNNER).status());
+        h.manager.eliminateParticipant(h.session.id(),C,Optional.empty(),NOW);
+        assertEquals(OperationStatus.INVALID_STATE,h.service.debugSetRole(h.session.id(),h.session.revision(),C,TeamRole.RUNNER).status());
+        assertTrue(h.session.isEliminatedParticipant(C));
+    }
+
+    @Test void settingTheExistingRoleOnlyReplaysPresentation() {
+        Harness h=new Harness();var before=h.snapshot();
+        assertTrue(h.service.debugSetRole(h.session.id(),h.session.revision(),A,TeamRole.RUNNER).successful());
+        assertEquals(before,h.snapshot());assertEquals(1,h.roleReveals);assertEquals(0,h.rolesSynced);assertTrue(h.events.isEmpty());
+    }
+
+    @Test void debugReshuffleChangesTheTeamEvenWhenTheRandomDrawMatchesTheOldTeam() {
+        Harness h=new Harness(new Random(0){@Override public int nextInt(int bound){return bound-1;}});
+        assertTrue(h.service.debugReshuffleRoles(h.session.id(),h.session.revision()).successful());
+        assertEquals(List.of(B,C),h.session.runnerIds());assertEquals(1,h.rolesSynced);assertEquals(2,h.session.livingRunnerIds().size());
+    }
+
+    @Test void debugReshuffleRefusesWhenNoEligibleAlternativeExists() {
+        Harness h=new Harness();h.unavailable.addAll(Set.of(C,D));var before=h.snapshot();
+        assertEquals(OperationStatus.INVALID_ASSIGNMENT,h.service.debugReshuffleRoles(h.session.id(),h.session.revision()).status());
+        assertEquals(before,h.snapshot());assertEquals(0,h.rolesSynced);assertTrue(h.events.isEmpty());
+    }
+
+    @Test void debugRoleChangesHonorCancellationReentryAndStaleState() {
+        Harness h=new Harness();var before=h.snapshot();
+        h.listener=event->{if(event instanceof RolesChangingEvent changing){
+            assertEquals(OperationStatus.BUSY,h.service.debugSetRole(h.session.id(),h.session.revision(),D,TeamRole.RUNNER).status());changing.setCancelled(true);
+        }};
+        assertEquals(OperationStatus.CANCELLED,h.service.debugSetRole(h.session.id(),h.session.revision(),C,TeamRole.RUNNER).status());assertEquals(before,h.snapshot());
+        assertEquals(OperationStatus.STALE_SESSION,h.service.debugReshuffleRoles(UUID.randomUUID(),h.session.revision()).status());
+        assertEquals(OperationStatus.STALE_REVISION,h.service.debugReshuffleRoles(h.session.id(),h.session.revision()-1).status());
+        h.mainThread=false;assertEquals(OperationStatus.WRONG_THREAD,h.service.debugSetRole(h.session.id(),-1,C,TeamRole.RUNNER).status());
+    }
     @Test void publicRegistriesShareARealOwnerAndDisableRestoresBothMenuRoutes() throws Exception {
         Harness h = new Harness();
         // Replace only the live-world adapters: ownership, entrypoints and disable dispatch are real.
@@ -380,7 +427,7 @@ class PaperExtensionServiceTest {
     }
 
     private static final class Harness implements ExtensionRuntime {
-        final GameManager manager = new GameManager(new RoleAssigner(new Random(7)));
+        final GameManager manager;
         final Plugin owner = owner("test");
         final Set<UUID> unavailable = new HashSet<>();
         final Set<UUID> offline = new HashSet<>();
@@ -388,13 +435,17 @@ class PaperExtensionServiceTest {
         final List<Event> events = new ArrayList<>();
         Consumer<Event> listener = event -> {};
         boolean mainThread = true;
-        int rolesSynced, syncFailures, stopCalls;
+        int rolesSynced, roleReveals, syncFailures, stopCalls;
         GameResult finished;
         final GameSession session;
         final PaperExtensionService service;
         final Server server;
 
         Harness() {
+            this(new Random(7));
+        }
+        Harness(Random random) {
+            manager=new GameManager(new RoleAssigner(random));
             manager.teamSelections().choose(A, TeamPreference.RUNNER, 2);
             manager.teamSelections().choose(B, TeamPreference.RUNNER, 2);
             session = manager.start(List.of(new Participant(A, "a"), new Participant(B, "b"),
@@ -441,6 +492,7 @@ class PaperExtensionServiceTest {
             rolesSynced++;
             if (syncFailures-- > 0) throw new IllegalStateException("synchronization failed");
         }
+        @Override public void revealRoles(GameSession session) { roleReveals++; }
         @Override public boolean eliminate(UUID sessionId, UUID id) {
             if (!service.shouldEliminate(session, id, "API")) return false;
             manager.eliminateParticipant(sessionId, id, Optional.empty(), NOW);
