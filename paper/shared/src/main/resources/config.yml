@@ -12,6 +12,8 @@ reset-players-at-start: true
 show-chat-prefix: true
 allow-blaze-spawner-break: false
 prevent-nether-portal-destruction: false
+# Global Nether portal coordinate ratio; integer >= 1, effective immediately in every game phase.
+nether-coordinate-scale: 8
 ore-fortune-level: 0
 blaze-rod-looting-level: 0
 adjust-piglin-bartering: false

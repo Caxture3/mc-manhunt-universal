@@ -40,6 +40,8 @@
 
 `prevent-nether-portal-destruction` 默认为 `false`，开启后仅在正式游戏期间保护下界传送门的门体和必要门框，包含创造模式与 OP。通过 `/mhu config prevent-nether-portal-destruction true` 或点击配置项开启；详见[下界传送门保护说明](docs/nether-portal-protection.md)。
 
+`nether-coordinate-scale` 默认为 `8`，接受不小于1的整数，全程修改所有玩家与实体的下界门坐标对应倍率。例如 `/mhu config nether-coordinate-scale 4`，成功保存后立即生效，指南针跨维度投影同步更新。详见[下界坐标倍率](docs/nether-coordinate-scale.md)。
+
 可选优化默认关闭，可通过配置列表交互或以下命令开启，仅在正式游戏期间生效：
 
 | 配置项 | 默认值 | 作用 |

@@ -97,6 +97,7 @@ config:
     runner-count: "速通者人数"
     allow-blaze-spawner-break: "允许破坏烈焰人刷怪笼"
     prevent-nether-portal-destruction: "禁止在下界破坏传送门"
+    nether-coordinate-scale: "下界坐标对应倍率"
     runner-compass-enabled: "速通者指南针"
     hunter-compass-enabled: "猎人指南针"
     reset-players-at-start: "开局重置玩家"

@@ -23,6 +23,10 @@ public final class ConfigurationService {
     private IntConsumer runnerCountChanged = ignored -> {};
     private Consumer<BooleanConfigKey> booleanChanged = ignored -> {};
     private Runnable structureUnlockTimesChanged = () -> {};
+    private Runnable netherCoordinateScaleChanged = () -> {};
+    public synchronized void onNetherCoordinateScaleChanged(Runnable listener) {
+        netherCoordinateScaleChanged = Objects.requireNonNull(listener);
+    }
     private java.util.function.Function<String, Object> effectiveValue;
     private java.util.function.Function<String,Object> activeValue;
     private java.util.function.BiFunction<String, Object, Boolean> registryWrite;
@@ -106,6 +110,7 @@ public final class ConfigurationService {
 
     public synchronized boolean update(IntConfigKey key, int value) {
         if (registryWrite != null) return registryWrite.apply(key.configKey(), value);
+        int previousValue = values.get(key);
         ConfigurationValues updated = values.with(key, value);
         Object previousRaw = yaml.get(key.configKey());
         yaml.set(key.configKey(), value);
@@ -116,6 +121,7 @@ public final class ConfigurationService {
         values = updated;
         if (key == IntConfigKey.RUNNER_COUNT) runnerCountChanged.accept(value);
         if (key.structureUnlockTime()) structureUnlockTimesChanged.run();
+        if (key == IntConfigKey.NETHER_COORDINATE_SCALE && value != previousValue) netherCoordinateScaleChanged.run();
         return true;
     }
 
@@ -177,6 +183,7 @@ public final class ConfigurationService {
         return true;
     }
     public synchronized void effectiveChanged(Set<String> keys) {
+        if (keys.contains(IntConfigKey.NETHER_COORDINATE_SCALE.configKey())) netherCoordinateScaleChanged.run();
         if (keys.contains(IntConfigKey.RUNNER_COUNT.configKey())) runnerCountChanged.accept(get(IntConfigKey.RUNNER_COUNT));
         for (var key : BooleanConfigKey.values()) if (keys.contains(key.configKey())) booleanChanged.accept(key);
         if (keys.contains(RunnerStructureUnlockTimes.CONFIG_KEY) || keys.stream().anyMatch(key -> key.startsWith(RunnerStructureUnlockTimes.CONFIG_KEY + ".")))

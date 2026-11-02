@@ -39,7 +39,7 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
         if(target!=null&&selection(player).isEmpty())registry.choose(player,target,registry.revision());
     }
     private final Map<UUID, Boolean> visible = new HashMap<>();
-    private final Map<UUID, Query> queries = new HashMap<>();
+    private final Map<UUID, TrackingLocateQuery> queries = new HashMap<>();
     private final Map<UUID, TrackingSnapshot> announced = new HashMap<>();
     private UUID session;
     private long version;
@@ -122,14 +122,14 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
         if(!overridden(player))tracking.extensionSelection(player, nativeTarget(target));
     }
     @Override public Optional<TrackingSnapshot> snapshot(UUID player) { return tracking.extensionSnapshot(player, effectiveTarget(player)); }
-    @Override public void refresh(UUID player) { Query query = queries.get(player); if (query != null) query.refresh = true; tracking.extensionRefreshRequested(player); }
+    @Override public void refresh(UUID player) { TrackingLocateQuery query = queries.get(player); if (query != null) query.refresh = true; tracking.extensionRefreshRequested(player); }
     @Override public void invalidate(TrackingInvalidation scope) {
         tracking.extensionInvalidateNative(scope);
         coordinator.invalidate(request -> scope.playerId().map(request.playerId()::equals).orElse(true)
                 && scope.targetId().map(request.targetId()::equals).orElse(true));
         for (UUID player : List.copyOf(queries.keySet())) if (scope.playerId().map(player::equals).orElse(true)
                 && scope.targetId().map(id -> effectiveTarget(player).filter(id::equals).isPresent()).orElse(true)) {
-            Query query = queries.get(player); query.pending = false; query.refresh = true;
+            TrackingLocateQuery query = queries.get(player); query.pending = false; query.refresh = true;
             // Revision changes invalidate a result immediately; ordinary refresh still obeys cooldown.
             if (query.request.targetRevision() != registry.revision()) queries.remove(player);
         }
@@ -139,6 +139,18 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
         for (UUID player : List.copyOf(selections.keySet())) if (registry.definition(selections.get(player)).isEmpty()) selection(player, null);
         if (scheduled || !plugin.isEnabled()) return; scheduled = true;
         plugin.getServer().getScheduler().runTask(plugin, () -> { scheduled = false; advance(TrackingChange.Source.REGISTRATION); tracking.extensionRefreshNow(); });
+    }
+    void netherCoordinateScaleChanged() {
+        for (var entry : List.copyOf(queries.entrySet())) {
+            var query = entry.getValue();
+            World from = plugin.getServer().getWorld(query.request.viewer().worldId());
+            World to = plugin.getServer().getWorld(query.request.origin().worldId());
+            if (!com.caxture.manhuntuniversal.portal.NetherCoordinateScale.applies(from, to)) continue;
+            coordinator.cancel(entry.getKey());
+            queries.put(entry.getKey(), query.invalidated(++version));
+            announced.remove(entry.getKey());
+            tracking.extensionProjectionInvalidated(entry.getKey());
+        }
     }
     void begin(GameSession game) {
         if (!game.id().equals(session)) { registry.clearMatch(); announced.clear(); }
@@ -169,36 +181,36 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
         queries.entrySet().removeIf(entry -> entry.getValue().request.origin().worldId().equals(world) || entry.getValue().request.viewer().worldId().equals(world)); }
     void tick() { coordinator.tick(); }
     boolean handles(UUID player) {
-        String target = effectiveTarget(player).orElse(null); Query query = queries.get(player);
+        String target = effectiveTarget(player).orElse(null); TrackingLocateQuery query = queries.get(player);
         return target != null && registry.customLocator(target) && (query == null || query.result == null || query.result.status() != LocateResult.Status.USE_CORE);
     }
-    Optional<LocateResult> result(UUID player) { Query query = queries.get(player); return query == null ? Optional.empty() : Optional.ofNullable(query.result); }
+    Optional<LocateResult> result(UUID player) { TrackingLocateQuery query = queries.get(player); return query == null ? Optional.empty() : Optional.ofNullable(query.result); }
     void maintain(Player player) {
         String target = effectiveTarget(player.getUniqueId()).orElse(null); if (target == null || !registry.customLocator(target)) return;
         var definition = registry.definition(target).orElse(null); if (definition == null) return;
-        Location origin = tracking.extensionOrigin(player, definition.world()); Query old = queries.get(player.getUniqueId());
+        Location origin = tracking.extensionOrigin(player, definition.world()); TrackingLocateQuery old = queries.get(player.getUniqueId());
         if (origin == null) {
             var context=viewer(player.getUniqueId()).orElse(null);if(context==null||context.match().isEmpty())return;
             var request=new LocateRequest(context.match().get().id(),registry.revision(),++version,player.getUniqueId(),target,context.position(),context.position(),context.match(),tracking.extensionSettings().searchRadiusBlocks());
-            Query unavailable=new Query(request,Instant.now(clock),context.position());unavailable.pending=false;unavailable.result=LocateResult.notFound("Target world is unavailable");queries.put(player.getUniqueId(),unavailable);return;
+            TrackingLocateQuery unavailable=new TrackingLocateQuery(request,Instant.now(clock),context.position());unavailable.pending=false;unavailable.result=LocateResult.notFound("Target world is unavailable");queries.put(player.getUniqueId(),unavailable);return;
         }
         Location movement=tracking.extensionMovementReference(player,origin.getWorld());
         Instant now = Instant.now(clock); TrackingSettings settings = tracking.extensionSettings();
         boolean moved = old != null && TrackingMovementReference.moved(old.movement,point(movement),settings.retargetDistanceBlocks());
-        boolean ready = old == null || !old.pending && Duration.between(old.submittedAt, now).getSeconds() >= settings.retargetCooldownSeconds()
-                && (old.refresh || moved || !old.request.viewer().worldId().equals(player.getWorld().getUID()));
+        boolean ready = old == null || old.ready(now, settings.retargetCooldownSeconds(), moved,
+                old.request.viewer().worldId().equals(player.getWorld().getUID()));
         if (!ready) return;
         if(old!=null&&(moved||old.refresh))origin=movement;
         var context = viewer(player.getUniqueId()).orElse(null); if (context == null || context.match().isEmpty()) return;
         var request = new LocateRequest(context.match().get().id(), registry.revision(), ++version, player.getUniqueId(), target,
                 context.position(), point(origin), context.match(), settings.searchRadiusBlocks());
-        Query query = new Query(request, now,point(movement)); queries.put(player.getUniqueId(), query);
+        TrackingLocateQuery query = new TrackingLocateQuery(request, now,point(movement)); queries.put(player.getUniqueId(), query);
         var binding = registry.locator(target).orElse(null);
         if (binding == null || !coordinator.request(request, binding)) { queries.remove(player.getUniqueId()); return; }
     }
     private boolean current(LocateRequest request) {
-        Query query = queries.get(request.playerId());
-        return query != null && query.request.requestVersion() == request.requestVersion() && request.targetRevision() == registry.revision()
+        TrackingLocateQuery query = queries.get(request.playerId());
+        return query != null && query.current(request) && request.targetRevision() == registry.revision()
                 && effectiveTarget(request.playerId()).filter(request.targetId()::equals).isPresent()
                 && match.get().filter(value -> value.id().equals(request.sessionId()) && value.state() == MatchState.RUNNING).isPresent()
                 && (overridden(request.playerId())?tracking.extensionMayControl(request.playerId()):maySelect(request.playerId())) && plugin.getServer().getWorld(request.origin().worldId()) != null
@@ -206,7 +218,7 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
                 && (overridden(request.playerId())||registry.availability(request.targetId(), request.playerId(), TrackingChange.Source.PLAYER_STATE).selectable());
     }
     private void completed(TrackingLocateCoordinator.Completion completion) {
-        Query query = queries.get(completion.request().playerId()); if (query == null) return;
+        TrackingLocateQuery query = queries.get(completion.request().playerId()); if (query == null) return;
         query.pending = false; query.result = completion.result();
         if (query.result.status() == LocateResult.Status.USE_CORE && nativeTarget(query.request.targetId()) == TrackingTargetId.NONE)
             query.result = LocateResult.failed("No native locator exists for this target");
@@ -260,8 +272,5 @@ final class ExtendedTrackingController implements TrackingRegistryService.Runtim
     private static double distance(WorldPosition first, WorldPosition second) {
         return Math.sqrt(Math.pow(first.x() - second.x(), 2) + Math.pow(first.y() - second.y(), 2) + Math.pow(first.z() - second.z(), 2));
     }
-    private static final class Query {
-        final LocateRequest request; final Instant submittedAt;final WorldPosition movement; boolean pending = true, refresh; LocateResult result;
-        Query(LocateRequest request, Instant at,WorldPosition movement) { this.request = request; submittedAt = at;this.movement=movement; }
-    }
+
 }

@@ -12,8 +12,8 @@ public final class CoreConfigurationBindings {
                                      Function<String, LocalizedText> names) {
         for (var key : IntConfigKey.values()) {
             if (key.structureUnlockTime()) continue;
-            ConfigTiming timing = key == IntConfigKey.RUNNER_COUNT || key.name().startsWith("TRACKING_")
-                    ? ConfigTiming.NEXT_MATCH : ConfigTiming.RUNNING_ONLY;
+            ConfigTiming timing = key == IntConfigKey.NETHER_COORDINATE_SCALE ? ConfigTiming.IMMEDIATE
+                    : key == IntConfigKey.RUNNER_COUNT || key.name().startsWith("TRACKING_") ? ConfigTiming.NEXT_MATCH : ConfigTiming.RUNNING_ONLY;
             registry.registerCore(definition(key.configKey(), names.apply(key.configKey()), key.defaultValue(),
                     ConfigTypes.integers(key.minimum(), key.maximum()), () -> configuration.savedValues().get(key),
                     value -> configuration.commitRaw(Map.of(key.configKey(), value)), timing, ""));

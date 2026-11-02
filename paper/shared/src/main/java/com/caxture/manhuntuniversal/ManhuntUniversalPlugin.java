@@ -97,6 +97,7 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
         clientPublisher.setCloseHandler((player, close) ->
                 tracking.cancelRunnerSelection(player, close.sessionId(), close.authorizationId()));
         configuration.onStructureUnlockTimesChanged(tracking::structureUnlockTimesChanged);
+        configuration.onNetherCoordinateScaleChanged(tracking::netherCoordinateScaleChanged);
         getServer().getOnlinePlayers().forEach(tracking::cleanupStale);
 
         activeGame = new ActiveGameCoordinator(
@@ -132,6 +133,8 @@ public final class ManhuntUniversalPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new GameEventListener(activeGame, gameManager, teamPresenter), this);
         getServer().getPluginManager().registerEvents(new TrackingCompassListener(tracking), this);
         getServer().getPluginManager().registerEvents(new PortalTrackingListener(tracking), this);
+        getServer().getPluginManager().registerEvents(new com.caxture.manhuntuniversal.portal.NetherCoordinateScaleListener(
+                () -> configuration.get(com.caxture.manhuntuniversal.config.IntConfigKey.NETHER_COORDINATE_SCALE), getServer()::getMaxWorldSize), this);
         getServer().getPluginManager().registerEvents(clientPublisher, this);
         getServer().getPluginManager().registerEvents(
                 new BlazeSpawnerProtectionListener(language, gameManager, configuration), this);

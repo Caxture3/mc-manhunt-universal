@@ -97,6 +97,7 @@ config:
     runner-count: "Speedrunner count"
     allow-blaze-spawner-break: "Allow breaking blaze spawners"
     prevent-nether-portal-destruction: "Prevent portal destruction in the Nether"
+    nether-coordinate-scale: "Nether coordinate scale"
     runner-compass-enabled: "Speedrunner compass"
     hunter-compass-enabled: "Hunter compass"
     reset-players-at-start: "Reset players at start"

@@ -327,6 +327,23 @@ public final class CompassTrackingService {
         tick(session);
     }
 
+    /** Invalidates only affected subscriptions; exact-input structure locations remain valid. */
+    public void netherCoordinateScaleChanged() {
+        if (state == null) return;
+        for (var entry : List.copyOf(staticSearches.entrySet())) {
+            UUID id = entry.getKey(); StaticSearchState search = entry.getValue();
+            Player viewer = onlinePlayer(id); World target = server.getWorld(search.worldId());
+            if (viewer == null || !com.caxture.manhuntuniversal.portal.NetherCoordinateScale.applies(viewer.getWorld(), target)) continue;
+            state.invalidate(id);
+            sharedStructures.cancel(id);
+            staticSearches.put(id, new StaticSearchState(search.target(), search.worldId(), search.origin(), null,
+                    search.searchedAt(), true, search.token()));
+            deferredNativeRefresh.request(id, search.searchedAt().plusSeconds(extensionSettings().retargetCooldownSeconds()));
+            lastDisplays.remove(id);
+        }
+        if (extensions != null) extensions.netherCoordinateScaleChanged();
+    }
+
     public void playerChangedWorld(Player player, Location from) {
         if (state == null) {
             return;
@@ -856,56 +873,15 @@ public final class CompassTrackingService {
     }
 
     private Location searchOrigin(Player player, World targetWorld) {
-        if (player.getWorld().equals(targetWorld)) return player.getLocation().clone();
-        Optional<TrackingPosition> visited = state.lastPosition(
-                player.getUniqueId(), targetWorld.getUID());
-        if (visited.isPresent()) {
-            return location(visited.orElseThrow());
-        }
-        TrackingWorldKind from = worldKind(player.getWorld());
-        TrackingWorldKind to = worldKind(targetWorld);
-        Location current = player.getLocation();
-        if (from == TrackingWorldKind.OVERWORLD && to == TrackingWorldKind.NETHER) {
-            return new Location(
-                    targetWorld,
-                    current.getX() / 8.0,
-                    targetWorld.getSpawnLocation().getY(),
-                    current.getZ() / 8.0);
-        }
-        if (from == TrackingWorldKind.NETHER && to == TrackingWorldKind.OVERWORLD) {
-            return new Location(
-                    targetWorld,
-                    current.getX() * 8.0,
-                    targetWorld.getSpawnLocation().getY(),
-                    current.getZ() * 8.0);
-        }
-        return targetWorld.getSpawnLocation();
+        return TrackingCoordinateProjection.origin(player.getLocation(), targetWorld,
+                state.lastPosition(player.getUniqueId(), targetWorld.getUID()),
+                configuration.get(com.caxture.manhuntuniversal.config.IntConfigKey.NETHER_COORDINATE_SCALE), server.getMaxWorldSize());
     }
 
     private Location movementReference(Player player, World targetWorld) {
-        if (player.getWorld().equals(targetWorld)) {
-            return player.getLocation();
-        }
-        TrackingWorldKind from = worldKind(player.getWorld());
-        TrackingWorldKind to = worldKind(targetWorld);
-        Location current = player.getLocation();
-        if (from == TrackingWorldKind.OVERWORLD && to == TrackingWorldKind.NETHER) {
-            return new Location(
-                    targetWorld,
-                    current.getX() / 8.0,
-                    targetWorld.getSpawnLocation().getY(),
-                    current.getZ() / 8.0);
-        }
-        if (from == TrackingWorldKind.NETHER && to == TrackingWorldKind.OVERWORLD) {
-            return new Location(
-                    targetWorld,
-                    current.getX() * 8.0,
-                    targetWorld.getSpawnLocation().getY(),
-                    current.getZ() * 8.0);
-        }
-        return state.lastPosition(player.getUniqueId(), targetWorld.getUID())
-                .map(this::location)
-                .orElse(targetWorld.getSpawnLocation());
+        return TrackingCoordinateProjection.reference(player.getLocation(), targetWorld,
+                state.lastPosition(player.getUniqueId(), targetWorld.getUID()),
+                configuration.get(com.caxture.manhuntuniversal.config.IntConfigKey.NETHER_COORDINATE_SCALE), server.getMaxWorldSize());
     }
 
     private TrackingDisplay located(
@@ -1427,6 +1403,7 @@ public final class CompassTrackingService {
     Location extensionMovementReference(Player player,World world){return movementReference(player,world);}
     void extensionRefreshNow() { runningSession().ifPresent(this::tick); }
     void extensionDisplayNow() { runningSession().ifPresent(this::refreshDistanceDisplays); }
+    void extensionProjectionInvalidated(UUID player) { lastDisplays.remove(player); }
     private TrackingDisplay overrideDisplay(Player player,Instant now,boolean allowSearch) {
         UUID id=player.getUniqueId();
         if(extensions.disabled(id))return new TrackingDisplay("tracking.actionbar.disabled",Map.of(),null,player.getWorld());
