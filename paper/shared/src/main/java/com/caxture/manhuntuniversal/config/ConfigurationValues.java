@@ -9,15 +9,17 @@ public final class ConfigurationValues {
     private final EnumMap<IntConfigKey, Integer> integers;
     private final EnumMap<BooleanConfigKey, Boolean> booleans;
     private final EnumMap<DecimalConfigKey, Double> decimals;
+    private final PlayerStartPositions startPositions;
 
     private ConfigurationValues(
             Map<IntConfigKey, Integer> integers,
             Map<BooleanConfigKey, Boolean> booleans,
-            Map<DecimalConfigKey, Double> decimals
+            Map<DecimalConfigKey, Double> decimals, PlayerStartPositions startPositions
     ) {
         this.integers = new EnumMap<>(integers);
         this.booleans = new EnumMap<>(booleans);
         this.decimals = new EnumMap<>(decimals);
+        this.startPositions = Objects.requireNonNull(startPositions);
     }
 
     public static ConfigurationValues defaults() {
@@ -33,7 +35,7 @@ public final class ConfigurationValues {
         for (DecimalConfigKey key : DecimalConfigKey.values()) {
             decimals.put(key, key.defaultValue());
         }
-        return new ConfigurationValues(integers, booleans, decimals);
+        return new ConfigurationValues(integers, booleans, decimals, PlayerStartPositions.defaults());
     }
 
     public static ConfigurationValues fromRaw(Map<String, Object> raw, Consumer<String> warning) {
@@ -74,7 +76,10 @@ public final class ConfigurationValues {
                 warning.accept(key.configKey());
             }
         }
-        return new ConfigurationValues(integers, booleans, decimals);
+        PlayerStartPositions positions;
+        try { positions = raw.get(PlayerStartPositions.KEY) instanceof Map<?,?> map ? PlayerStartPositions.fromMap(map) : PlayerStartPositions.defaults(); }
+        catch(RuntimeException error){positions=PlayerStartPositions.defaults();warning.accept(PlayerStartPositions.KEY);}
+        return new ConfigurationValues(integers, booleans, decimals, positions);
     }
 
     private static boolean isIntegerNumber(Object candidate) {
@@ -103,14 +108,14 @@ public final class ConfigurationValues {
         }
         EnumMap<IntConfigKey, Integer> updated = new EnumMap<>(integers);
         updated.put(key, value);
-        return new ConfigurationValues(updated, booleans, decimals);
+        return new ConfigurationValues(updated, booleans, decimals, startPositions);
     }
 
     public ConfigurationValues with(BooleanConfigKey key, boolean value) {
         Objects.requireNonNull(key, "key");
         EnumMap<BooleanConfigKey, Boolean> updated = new EnumMap<>(booleans);
         updated.put(key, value);
-        return new ConfigurationValues(integers, updated, decimals);
+        return new ConfigurationValues(integers, updated, decimals, startPositions);
     }
 
     public ConfigurationValues with(DecimalConfigKey key, double value) {
@@ -120,8 +125,11 @@ public final class ConfigurationValues {
         }
         EnumMap<DecimalConfigKey, Double> updated = new EnumMap<>(decimals);
         updated.put(key, value);
-        return new ConfigurationValues(integers, booleans, updated);
+        return new ConfigurationValues(integers, booleans, updated, startPositions);
     }
+
+    public PlayerStartPositions playerStartPositions(){return startPositions;}
+    public ConfigurationValues with(PlayerStartPositions positions){return new ConfigurationValues(integers,booleans,decimals,positions);}
 
     public TrackingSettings trackingSettings() {
         return new TrackingSettings(

@@ -67,7 +67,7 @@ public final class ConfigurationService {
         for (var key : IntConfigKey.values()) snapshot = snapshot.with(key, get(key));
         for (var key : BooleanConfigKey.values()) snapshot = snapshot.with(key, get(key));
         for (var key : DecimalConfigKey.values()) snapshot = snapshot.with(key, get(key));
-        return snapshot;
+        return snapshot.with(PlayerStartPositions.fromMap((Map<?,?>) effectiveValue.apply(PlayerStartPositions.KEY)));
     }
 
     public synchronized ConfigurationValues savedValues() { return values; }
@@ -85,7 +85,7 @@ public final class ConfigurationService {
         for(var key:IntConfigKey.values())snapshot=snapshot.with(key,((Number)activeValue.apply(key.configKey())).intValue());
         for(var key:BooleanConfigKey.values())snapshot=snapshot.with(key,(Boolean)activeValue.apply(key.configKey()));
         for(var key:DecimalConfigKey.values())snapshot=snapshot.with(key,((Number)activeValue.apply(key.configKey())).doubleValue());
-        return snapshot;
+        return snapshot.with(PlayerStartPositions.fromMap((Map<?,?>) activeValue.apply(PlayerStartPositions.KEY)));
     }
 
     public synchronized int get(IntConfigKey key) {
@@ -171,7 +171,8 @@ public final class ConfigurationService {
             var integer = IntConfigKey.find(entry.getKey()).orElse(null);
             var bool = BooleanConfigKey.find(entry.getKey()).orElse(null);
             var decimal = DecimalConfigKey.find(entry.getKey()).orElse(null);
-            if (integer != null) candidate = candidate.with(integer, ((Number) entry.getValue()).intValue());
+            if(entry.getKey().equals(PlayerStartPositions.KEY))candidate=candidate.with(PlayerStartPositions.fromMap((Map<?,?>)entry.getValue()));
+            else if (integer != null) candidate = candidate.with(integer, ((Number) entry.getValue()).intValue());
             else if (bool != null) candidate = candidate.with(bool, (Boolean) entry.getValue());
             else if (decimal != null) candidate = candidate.with(decimal, ((Number) entry.getValue()).doubleValue());
             else throw new IllegalArgumentException("Unknown core key: " + entry.getKey());
@@ -201,6 +202,7 @@ public final class ConfigurationService {
         for (DecimalConfigKey key : DecimalConfigKey.values()) {
             raw.put(key.configKey(), yaml.get(key.configKey()));
         }
+        raw.put(PlayerStartPositions.KEY, plain(yaml.get(PlayerStartPositions.KEY)));
         Set<String> warned = new HashSet<>();
         return ConfigurationValues.fromRaw(raw, key -> {
             if (warned.add(key)) {
@@ -212,6 +214,7 @@ public final class ConfigurationService {
 
     private void persistMissingDefaults() {
         boolean changed = false;
+        if(!yaml.contains(PlayerStartPositions.KEY)){yaml.set(PlayerStartPositions.KEY, PlayerStartPositions.defaults().toMap());changed=true;}
         for (IntConfigKey key : IntConfigKey.values()) {
             if (!yaml.contains(key.configKey())) {
                 yaml.set(key.configKey(), key.defaultValue());
@@ -235,6 +238,11 @@ public final class ConfigurationService {
         }
     }
 
+    private static Object plain(Object value){
+        if(value instanceof org.bukkit.configuration.ConfigurationSection section)value=section.getValues(false);
+        if(value instanceof Map<?,?> map){Map<String,Object> result=new java.util.LinkedHashMap<>();map.forEach((k,v)->result.put(String.valueOf(k),plain(v)));return result;}
+        if(value instanceof java.util.List<?> list)return list.stream().map(ConfigurationService::plain).toList();return value;
+    }
     private boolean save() {
         try {
             writer.replace(configFile.toPath(), yaml.saveToString());

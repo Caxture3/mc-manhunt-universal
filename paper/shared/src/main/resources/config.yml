@@ -9,6 +9,14 @@ runner-structure-tracker-unlock-time:
   trial_chambers: -1
 hunter-compass-enabled: true
 reset-players-at-start: true
+hunter-start-wait-seconds: 0
+player-start-pos:
+  hunter:
+    mode: world-spawn
+    custom: []
+  runner:
+    mode: world-spawn
+    custom: []
 show-chat-prefix: true
 allow-blaze-spawner-break: false
 prevent-nether-portal-destruction: false

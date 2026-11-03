@@ -53,12 +53,16 @@ public final class RuntimePersistenceService {
         if(games.activeSession().isPresent())throw new IllegalStateException("A game already exists before checkpoint restore");
         game.ifPresent(value-> {
             var settings=value.settings();var search=settings.trackingSettings();
-            Map<String,Object> expected=Map.of("runner-count",settings.runnerCount(),"reset-players-at-start",settings.resetPlayersAtStart(),
-                    "tracking-retarget-distance-blocks",search.retargetDistanceBlocks(),"tracking-retarget-cooldown-seconds",search.retargetCooldownSeconds(),"tracking-search-radius-blocks",search.searchRadiusBlocks());
-            if(!saved.frozenConfig().equals(expected))throw new IllegalArgumentException("Frozen settings do not match the saved session");
-            configs.restoreMatch(value.id(),saved.frozenConfig());
+            Map<String,Object> expected=new LinkedHashMap<>(Map.of("runner-count",settings.runnerCount(),"reset-players-at-start",settings.resetPlayersAtStart(),
+                    "tracking-retarget-distance-blocks",search.retargetDistanceBlocks(),"tracking-retarget-cooldown-seconds",search.retargetCooldownSeconds(),"tracking-search-radius-blocks",search.searchRadiusBlocks()));
+            expected.put("hunter-start-wait-seconds",saved.startup().map(com.caxture.manhuntuniversal.player.StartupPlan::waitSeconds).orElse(0));
+            expected.put("player-start-pos",saved.startup().map(v->v.positions().toMap()).orElseGet(()->com.caxture.manhuntuniversal.config.PlayerStartPositions.defaults().toMap()));
+            var frozen=StartupCheckpointMigration.frozen(saved.frozenConfig(),saved.startup().isPresent());
+            if(!frozen.equals(expected))throw new IllegalArgumentException("Frozen settings do not match the saved session");
+            configs.restoreMatch(value.id(),frozen);
         });
         game.ifPresent(value->{if(!games.restore(value))throw new IllegalStateException("Cannot install saved game");});
+        games.activeSession().ifPresent(value->active.starts().restore(value,saved.startup()));
         pending.restoreSnapshot(saved.pendingResets(),saved.blindness());active.restoreSpectators(saved.spectatorModes());identity.restoreListSnapshot(saved.listRestores());
         gate.begin(game.map(SessionSnapshot::id));
         resumeTask=plugin.getServer().getScheduler().runTask(plugin,()-> {
@@ -86,7 +90,7 @@ public final class RuntimePersistenceService {
         Optional<GameSession> game=games.activeSession().filter(value->value.state()!=SessionState.SETTLING);
         return new RuntimeCheckpoint(Instant.now(clock),game.map(GameSession::snapshot),game.filter(value->value.state()==SessionState.COUNTDOWN).map(value->Math.max(1,active.countdownRemaining(value.id()))).orElse(0),
                 game.isPresent()?pending.resetSnapshot():Set.of(),pending.blindnessSnapshot(),active.spectatorSnapshot(),identity.snapshotListRestores(),
-                game.isPresent()?tracking.selectionSnapshot():Map.of(),game.isPresent()?configs.frozenCoreSnapshot():Map.of(),game.isPresent()?tracking.positionSnapshot():Map.of());
+                game.isPresent()?tracking.selectionSnapshot():Map.of(),game.isPresent()?configs.frozenCoreSnapshot():Map.of(),game.isPresent()?tracking.positionSnapshot():Map.of(),game.isPresent()?active.starts().snapshot():Optional.empty());
     }
     public void saveCurrent() {
         if(blocked||closing||!gate.mayWrite(games.activeSession().map(GameSession::id)))return;

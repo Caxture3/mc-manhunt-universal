@@ -13,7 +13,7 @@ public final class CoreConfigurationBindings {
         for (var key : IntConfigKey.values()) {
             if (key.structureUnlockTime()) continue;
             ConfigTiming timing = key == IntConfigKey.NETHER_COORDINATE_SCALE ? ConfigTiming.IMMEDIATE
-                    : key == IntConfigKey.RUNNER_COUNT || key.name().startsWith("TRACKING_") ? ConfigTiming.NEXT_MATCH : ConfigTiming.RUNNING_ONLY;
+                    : (key == IntConfigKey.RUNNER_COUNT || key == IntConfigKey.HUNTER_START_WAIT_SECONDS) || key.name().startsWith("TRACKING_") ? ConfigTiming.NEXT_MATCH : ConfigTiming.RUNNING_ONLY;
             registry.registerCore(definition(key.configKey(), names.apply(key.configKey()), key.defaultValue(),
                     ConfigTypes.integers(key.minimum(), key.maximum()), () -> configuration.savedValues().get(key),
                     value -> configuration.commitRaw(Map.of(key.configKey(), value)), timing, ""));
@@ -32,6 +32,8 @@ public final class CoreConfigurationBindings {
         for (var key : DecimalConfigKey.values()) registry.registerCore(definition(key.configKey(), names.apply(key.configKey()),
                 key.defaultValue(), ConfigTypes.decimals(key.minimum(), key.maximum()), () -> configuration.savedValues().get(key),
                 value -> configuration.commitRaw(Map.of(key.configKey(), value)), ConfigTiming.IMMEDIATE, "s"));
+        registry.registerCore(definition(PlayerStartPositions.KEY,names.apply(PlayerStartPositions.KEY+".title"),PlayerStartPositions.defaults().toMap(),PlayerStartPositions.type(),
+                ()->configuration.savedValues().playerStartPositions().toMap(),value->configuration.commitRaw(Map.of(PlayerStartPositions.KEY,value)),ConfigTiming.NEXT_MATCH,""));
         Map<String, ConfigField<?>> fields = new LinkedHashMap<>();
         Map<String, Object> defaults = new LinkedHashMap<>();
         for (var key : IntConfigKey.values()) if (key.structureUnlockTime()) {

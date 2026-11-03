@@ -8,6 +8,8 @@ import org.bukkit.command.CommandSender;
 import java.time.Instant;
 
 public interface MatchPresentation {
+    default void showHunterStartCountdown(org.bukkit.entity.Player player,long seconds){}
+    default void clearHunterStartCountdown(org.bukkit.entity.Player player){player.sendActionBar(net.kyori.adventure.text.Component.empty());}
     void showCountdown(GameSession session, int seconds);
 
     void showStart(GameSession session);

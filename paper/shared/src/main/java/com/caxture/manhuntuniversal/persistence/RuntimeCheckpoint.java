@@ -10,9 +10,15 @@ public record RuntimeCheckpoint(Instant savedAt, Optional<SessionSnapshot> game,
                                 Set<UUID> pendingResets, Map<UUID,Optional<BlindnessSnapshot>> blindness,
                                 Map<UUID,RunnerSpectatorService.OriginalMode> spectatorModes,
                                 Map<UUID,String> listRestores, Map<UUID,String> trackingSelections, Map<String,Object> frozenConfig,
-                                Map<UUID,java.util.List<com.caxture.manhuntuniversal.tracking.TrackingPosition>> positions) {
+                                Map<UUID,java.util.List<com.caxture.manhuntuniversal.tracking.TrackingPosition>> positions,
+                                Optional<StartupPlan> startup) {
+    public RuntimeCheckpoint(Instant savedAt,Optional<SessionSnapshot> game,int countdownSeconds,Set<UUID> pendingResets,Map<UUID,Optional<BlindnessSnapshot>> blindness,
+                             Map<UUID,RunnerSpectatorService.OriginalMode> spectatorModes,Map<UUID,String> listRestores,Map<UUID,String> trackingSelections,Map<String,Object> frozenConfig,
+                             Map<UUID,java.util.List<com.caxture.manhuntuniversal.tracking.TrackingPosition>> positions){this(savedAt,game,countdownSeconds,pendingResets,blindness,spectatorModes,listRestores,trackingSelections,frozenConfig,positions,Optional.empty());}
     public RuntimeCheckpoint {
         Objects.requireNonNull(savedAt);Objects.requireNonNull(game);
+        Objects.requireNonNull(startup);
+        if(startup.isPresent()&&(game.isEmpty()||!startup.get().sessionId().equals(game.get().id())))throw new IllegalArgumentException("Invalid startup session");
         pendingResets=Set.copyOf(pendingResets);blindness=Map.copyOf(blindness);spectatorModes=Map.copyOf(spectatorModes);
         listRestores=Map.copyOf(listRestores);trackingSelections=Map.copyOf(trackingSelections);
         Map<UUID,java.util.List<com.caxture.manhuntuniversal.tracking.TrackingPosition>> copied=new LinkedHashMap<>();positions.forEach((id,values)->copied.put(id,java.util.List.copyOf(values)));positions=Map.copyOf(copied);
@@ -27,6 +33,8 @@ public record RuntimeCheckpoint(Instant savedAt, Optional<SessionSnapshot> game,
         if(game.isPresent()) {
             Set<UUID> roster=new HashSet<>();game.get().participants().forEach(player->roster.add(player.id()));
             if(!roster.containsAll(pendingResets)||!roster.containsAll(trackingSelections.keySet())||!roster.containsAll(positions.keySet()))throw new IllegalArgumentException("Unknown game participant");
+            if(startup.isPresent()&&(!roster.containsAll(startup.get().targets().keySet())||!roster.containsAll(startup.get().anchors().keySet())
+                    ||game.get().settings().resetPlayersAtStart()&&!startup.get().targets().keySet().equals(roster)))throw new IllegalArgumentException("Invalid startup participant destinations");
         }
         if(pendingResets.size()>10000||blindness.size()>10000||spectatorModes.size()>10000||listRestores.size()>10000||trackingSelections.size()>10000)
             throw new IllegalArgumentException("Checkpoint exceeds player limit");

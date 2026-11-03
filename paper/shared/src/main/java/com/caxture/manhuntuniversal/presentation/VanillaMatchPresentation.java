@@ -21,6 +21,8 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 
 public final class VanillaMatchPresentation implements MatchPresentation {
+    @Override public void showHunterStartCountdown(Player player,long seconds){language.actionbar(player,"core:hunter-start.countdown",language.component(player,"hunter-start.countdown",Map.of("seconds",Long.toString(seconds))));}
+    @Override public void clearHunterStartCountdown(Player player){language.actionbar(player,"core:hunter-start.countdown",net.kyori.adventure.text.Component.empty());}
     private static final Title.Times SHORT_TITLE = Title.Times.times(
             Duration.ofMillis(100), Duration.ofMillis(900), Duration.ofMillis(200));
     private static final Title.Times RESULT_TITLE = Title.Times.times(

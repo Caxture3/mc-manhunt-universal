@@ -95,6 +95,9 @@ config:
     blaze-rod-looting-level: "烈焰棒爆率提高等级 (0~5)"
     hunter-end-restriction-enabled: "速通者进入末地前 禁止猎人与末地传送门交互"
     runner-count: "速通者人数"
+    hunter-start-wait-seconds: "猎人开局等待时间（秒）"
+    player-start-pos:
+      title: "玩家开局位置"
     allow-blaze-spawner-break: "允许破坏烈焰人刷怪笼"
     prevent-nether-portal-destruction: "禁止在下界破坏传送门"
     nether-coordinate-scale: "下界坐标对应倍率"
@@ -186,3 +189,24 @@ tracking:
     not-found: "§f{target} §7| §c范围内未找到 §7| {dimension}"
     no-portal: "§f{target} §7| §c当前维度未找到传送门 §7| {dimension}"
     runner-select-target: "§7右键选择追踪目标"
+
+start-pos:
+  role:
+    hunter: "猎人"
+    runner: "速通者"
+  mode:
+    world-spawn: "世界出生点"
+    player-spawn: "玩家出生点"
+    custom: "自定义位置"
+  add: "[+ 添加新位置 +]"
+  remove: "[移除]"
+  duplicate: "此世界的列表中已存在相同位置。"
+  not-found: "此世界的列表中没有对应位置。"
+  stale: "{prefix}§e配置已发生变化，请使用刷新后的按钮。"
+  usage: "用法：/mhu config player-start-pos.<hunter|runner> <world-spawn|player-spawn|custom>，或 .add-custom/.remove-custom <x> <y> <z>"
+  invalid-start: "{prefix}§c无法开局：{reason}"
+  empty-custom: "{team}未设置自定义开局位置"
+  unavailable-world: "开局位置所在世界不可用：{world}"
+  invalid-position: "开局位置超出世界允许的坐标范围：{world} ({x}, {y}, {z})"
+hunter-start:
+  countdown: "§e开始行动：{seconds}"

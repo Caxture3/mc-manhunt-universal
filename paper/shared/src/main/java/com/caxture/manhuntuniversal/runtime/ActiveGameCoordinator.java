@@ -48,6 +48,9 @@ public final class ActiveGameCoordinator {
     private final MatchPresentation presentation;
     private final CompassTrackingService tracking;
     private final Clock clock;
+    private final com.caxture.manhuntuniversal.player.PlayerStartService starts;
+    private final com.caxture.manhuntuniversal.player.HunterStartWaitService hunterWait;
+    public com.caxture.manhuntuniversal.player.PlayerStartService starts(){return starts;}
 
     private BukkitTask countdownTask;
     private BukkitTask dragonPresenceTask;
@@ -91,6 +94,10 @@ public final class ActiveGameCoordinator {
         this.presentation = presentation;
         this.tracking = tracking;
         this.clock = clock;
+        this.starts = new com.caxture.manhuntuniversal.player.PlayerStartService(server);
+        this.hunterWait = new com.caxture.manhuntuniversal.player.HunterStartWaitService(plugin,gameManager,starts,pendingPlayers,blindness,presentation,clock,
+                ()->runningSession().ifPresent(tracking::tick),this::stopAdmin);
+        tracking.startupHeld(hunterWait::held);
         this.spectators = new RunnerSpectatorService(server, gameManager,
                 action -> server.getScheduler().runTask(plugin, () ->
                         extensionHooks.inMutation(() -> { action.run(); return null; })));
@@ -149,6 +156,7 @@ public final class ActiveGameCoordinator {
             return false;
         }
         identity.begin(activated);
+        try{hunterWait.start();}catch(RuntimeException|LinkageError error){plugin.getLogger().log(java.util.logging.Level.SEVERE,"Cannot initialize hunter waiting state",error);cancel(activated.id(),TerminationReason.START_CANCELLED,false);return false;}
         tracking.start(activated);
         presentation.showStart(activated);
         extensionHooks.started(activated);
@@ -207,6 +215,7 @@ public final class ActiveGameCoordinator {
         requireRunningSession(session);
         server.getOnlinePlayers().forEach(identity::restorePending);
         identity.begin(session);
+        hunterWait.start();
         tracking.resume(session,positions,selections);
         server.getOnlinePlayers().forEach(this::playerJoined);
         session.targetEndWorldId().ifPresent(world->startDragonPresenceProbe(session.id(),world));
@@ -245,6 +254,7 @@ public final class ActiveGameCoordinator {
         if (currentSession(session.id()).orElse(null) != session) return true;
         pendingResetRetrier.cancel(playerId);
         pendingPlayers.completeReset(playerId);
+        hunterWait.release(playerId,true);
         Player player = server.getPlayer(playerId);
         if (player != null && player.isOnline()) {
             spectators.eliminated(session, player);
@@ -292,6 +302,7 @@ public final class ActiveGameCoordinator {
 
     public void rolesChanged(GameSession session) {
         requireRunningSession(session);
+        hunterWait.sync();
         var knownPositions=tracking.positionSnapshot();
         // Revoke every old UI capability, search token and bound compass before issuing new roles.
         tracking.finish(session);
@@ -391,6 +402,7 @@ public final class ActiveGameCoordinator {
         }
         blindness.restore(player);
         identity.applyJoiningPlayer(session, player);
+        hunterWait.joined(player);
         tracking.playerJoined(player, session);
         if (session.isRunnerAlive(player.getUniqueId()) && player.getWorld().getEnvironment() == World.Environment.THE_END) {
             playerChangedWorld(player);
@@ -458,15 +470,19 @@ public final class ActiveGameCoordinator {
     }
 
     private boolean tryCompletePendingReset(GameSession session, Player player) {
+        org.bukkit.Location destination;
+        try{destination=starts.target(player.getUniqueId());}catch(IllegalArgumentException error){return false;}
         if (!player.teleport(
-                server.getWorlds().getFirst().getSpawnLocation(),
+                destination,
                 PlayerTeleportEvent.TeleportCause.PLUGIN)) {
             return false;
         }
         playerReset.reset(player);
+        if(session.roleOf(player.getUniqueId()).orElseThrow()==com.caxture.manhuntuniversal.game.Role.HUNTER)starts.anchor(player.getUniqueId(),player.getLocation());
         pendingPlayers.completeReset(player.getUniqueId());
         blindness.discard(player.getUniqueId());
         identity.applyJoiningPlayer(session, player);
+        hunterWait.joined(player);
         tracking.playerJoined(player, session);
         return true;
     }
@@ -533,6 +549,8 @@ public final class ActiveGameCoordinator {
         // Every subsystem must get its cleanup attempt even when another plugin breaks a platform operation.
         for (Runnable action : java.util.List.<Runnable>of(
                 this::cancelAllTasks, blindness::restoreAllOnline,
+                ()->hunterWait.stop(true),
+                starts::clear,
                 () -> tracking.finish(session), () -> identity.clear(session),
                 () -> spectators.finish(session.id()),
                 () -> session.participants().forEach(participant -> pendingPlayers.completeReset(participant.id())))) {
@@ -554,6 +572,7 @@ public final class ActiveGameCoordinator {
     }
 
     private void cancelAllTasks() {
+        hunterWait.stop(false);
         cancelCountdownTask();
         cancelDragonPresenceTask();
         pendingResetRetrier.cancelAll();

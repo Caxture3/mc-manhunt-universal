@@ -17,6 +17,7 @@ final class RuntimeCheckpointCodec {
         YamlConfiguration yaml=new YamlConfiguration();
         yaml.set("format",1);yaml.set("saved-at",saved.savedAt().toString());yaml.set("countdown",saved.countdownSeconds());
         saved.game().ifPresent(game->yaml.set("game",game(game)));
+        saved.startup().ifPresent(value->yaml.set("startup",value.toMap()));
         yaml.set("pending-resets",ids(saved.pendingResets()));
         Map<String,Object> blindness=new LinkedHashMap<>();
         saved.blindness().forEach((id,effect)->{
@@ -42,7 +43,8 @@ final class RuntimeCheckpointCodec {
         map(yaml.get("spectator-modes")).forEach((id,raw)->{var value=map(raw);modes.put(UUID.fromString(id),new RunnerSpectatorService.OriginalMode(uuid(value.get("session")),GameMode.valueOf(text(value.get("mode")))));});
         Map<UUID,List<TrackingPosition>> positions=new LinkedHashMap<>();map(yaml.get("positions")).forEach((id,raw)->positions.put(UUID.fromString(id),list(raw,entry->{var value=map(entry);return new TrackingPosition(uuid(value.get("world")),TrackingWorldKind.valueOf(text(value.get("kind"))),decimal(value.get("x")),decimal(value.get("y")),decimal(value.get("z")));})));
         return new RuntimeCheckpoint(Instant.parse(text(yaml.get("saved-at"))),Optional.ofNullable(yaml.get("game")).map(RuntimeCheckpointCodec::readGame),integer(yaml.get("countdown")),
-                new LinkedHashSet<>(readIds(yaml.get("pending-resets"))),blindness,modes,readUuidMap(yaml.get("list-restores")),readUuidMap(yaml.get("tracking-selections")),map(yaml.get("frozen-config")),positions);
+                new LinkedHashSet<>(readIds(yaml.get("pending-resets"))),blindness,modes,readUuidMap(yaml.get("list-restores")),readUuidMap(yaml.get("tracking-selections")),map(yaml.get("frozen-config")),positions,
+                Optional.ofNullable(yaml.get("startup")).map(value->StartupPlan.fromMap(map(value))));
     }
     private static Map<String,Object> game(SessionSnapshot game) {
         Map<String,Object> out=new LinkedHashMap<>();

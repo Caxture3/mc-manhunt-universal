@@ -5,6 +5,7 @@ import java.util.Optional;
 
 public enum IntConfigKey {
     RUNNER_COUNT("runner-count", 1, 1, 100),
+    HUNTER_START_WAIT_SECONDS("hunter-start-wait-seconds", 0, 0, Integer.MAX_VALUE),
     NETHER_COORDINATE_SCALE("nether-coordinate-scale", 8, 1, Integer.MAX_VALUE),
     ORE_FORTUNE_LEVEL("ore-fortune-level", 0, 0, 10),
     BLAZE_ROD_LOOTING_LEVEL("blaze-rod-looting-level", 0, 0, 5),

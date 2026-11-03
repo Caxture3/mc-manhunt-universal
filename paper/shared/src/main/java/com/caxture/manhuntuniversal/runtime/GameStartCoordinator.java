@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Objects;
 
 public final class GameStartCoordinator {
     private final Server server;
@@ -94,6 +95,12 @@ public final class GameStartCoordinator {
                 .map(player -> new Participant(player.getUniqueId(), player.getName()))
                 .toList();
         ConfigurationValues values = configuration.values();
+        if(gameManager.activeSession().isEmpty())try{com.caxture.manhuntuniversal.player.PlayerStartService.checkCustomLists(values);}
+        catch(IllegalArgumentException error){
+            String role=language.text(sender,"start-pos.role."+error.getMessage());
+            String reason=language.text(sender,"start-pos.empty-custom",Map.of("team",role));
+            language.send(sender,"start-pos.invalid-start",Map.of("reason",reason));return OperationStatus.START_REJECTED;
+        }
         StartResult result = gameManager.start(participants, settings(values), Instant.now(clock));
         if (result.status() == StartStatus.ALREADY_RUNNING) {
             language.send(sender, "game.start.already-running");
@@ -122,6 +129,8 @@ public final class GameStartCoordinator {
         }
         if (gameManager.activeSession().orElse(null) != session || session.revision() != revision
                 || session.state() != SessionState.COUNTDOWN) return OperationStatus.CANCELLED;
+        try{activeGame.starts().freeze(session,values);}
+        catch(RuntimeException error){language.send(sender,"start-pos.invalid-start",Map.of("reason",Objects.toString(error.getMessage(),"Invalid start position")));activeGame.abortStart(session.id());return OperationStatus.START_REJECTED;}
         if (countdownSeconds == 0) {
             return activate(session, sender) ? OperationStatus.OK : OperationStatus.START_REJECTED;
         }
@@ -142,6 +151,7 @@ public final class GameStartCoordinator {
                 || current.state() != SessionState.COUNTDOWN) {
             return false;
         }
+        try{activeGame.starts().validateTargets(session);}catch(RuntimeException error){language.send(sender,"start-pos.invalid-start",Map.of("reason",Objects.toString(error.getMessage(),"Invalid start position")));activeGame.abortStart(session.id());return false;}
         if (session.settings().resetPlayersAtStart() && !preparePlayers(session)) {
             language.send(sender, "game.start.teleport-failed");
             activeGame.abortStart(session.id());
@@ -176,10 +186,12 @@ public final class GameStartCoordinator {
         Map<UUID, Location> originalLocations = new LinkedHashMap<>();
         onlineParticipants.forEach(player -> originalLocations.put(
                 player.getUniqueId(), player.getLocation().clone()));
-        Location spawn = server.getWorlds().getFirst().getSpawnLocation();
+        Map<UUID,Location> destinations=new LinkedHashMap<>();
+        try{for(Player player:onlineParticipants)destinations.put(player.getUniqueId(),activeGame.starts().target(player.getUniqueId()));}
+        catch(IllegalArgumentException error){return false;}
         boolean teleported = AllOrNothingAction.execute(
                 onlineParticipants,
-                player -> player.teleport(spawn, PlayerTeleportEvent.TeleportCause.PLUGIN),
+                player -> player.teleport(destinations.get(player.getUniqueId()), PlayerTeleportEvent.TeleportCause.PLUGIN),
                 player -> player.teleport(
                         originalLocations.get(player.getUniqueId()), PlayerTeleportEvent.TeleportCause.PLUGIN));
         if (!teleported) {
@@ -188,6 +200,7 @@ public final class GameStartCoordinator {
         for (Player player : onlineParticipants) {
             if (gameManager.activeSession().orElse(null) != session || session.state() != SessionState.COUNTDOWN) return false;
             playerReset.reset(player);
+            if(session.roleOf(player.getUniqueId()).orElseThrow()==com.caxture.manhuntuniversal.game.Role.HUNTER)activeGame.starts().anchor(player.getUniqueId(),player.getLocation());
             pendingPlayers.completeReset(player.getUniqueId());
             blindness.discard(player.getUniqueId());
         }

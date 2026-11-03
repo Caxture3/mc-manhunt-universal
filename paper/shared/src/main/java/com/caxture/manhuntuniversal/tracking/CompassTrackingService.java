@@ -72,6 +72,8 @@ public final class CompassTrackingService {
     private final StructureUnlockAnnouncements unlockAnnouncements = new StructureUnlockAnnouncements();
     private final java.util.Set<UUID> coreUseDenied = new java.util.HashSet<>();
     private ExtendedTrackingController extensions;
+    private java.util.function.Predicate<UUID> startupHeld=ignored->false;
+    public void startupHeld(java.util.function.Predicate<UUID> predicate){startupHeld=Objects.requireNonNull(predicate);}
     private final DeferredTrackingRefresh deferredNativeRefresh=new DeferredTrackingRefresh();
     private final Set<UUID> forcedNativeRefresh=new HashSet<>();
     public com.caxture.manhuntuniversal.extension.tracking.TrackingRegistryService enableExtensions(
@@ -1119,6 +1121,7 @@ public final class CompassTrackingService {
     }
 
     private Optional<TrackingCompassKind> expectedKind(GameSession session, UUID playerId) {
+        if(startupHeld.test(playerId))return Optional.empty();
         if (session.isEliminatedParticipant(playerId)) return Optional.empty();
         Role role = session.roleOf(playerId).orElse(null);
         if(extensions!=null&&extensions.overridden(playerId)&&role!=null)return Optional.of(role==Role.RUNNER?TrackingCompassKind.RUNNER:TrackingCompassKind.HUNTER);
@@ -1342,6 +1345,7 @@ public final class CompassTrackingService {
                 && (!held || isCurrentCompass(heldCompass(player), session.id(), TrackingCompassKind.RUNNER));
     }
     boolean extensionMayControl(UUID id) {
+        if(startupHeld.test(id))return false;
         var session=runningSession().orElse(null);if(session==null||state==null||session.participant(id).isEmpty()||session.isEliminatedParticipant(id))return false;
         Player live=onlinePlayer(id);return live==null||!live.isDead()&&!pendingPlayers.needsReset(id)
                 &&configuration.coreEffect(com.caxture.manhuntuniversal.api.feature.CoreFeatureIds.TRACKING_COMPASS_USE,live,live.getLocation(),"tracking-override");

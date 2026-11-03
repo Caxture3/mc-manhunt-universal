@@ -95,6 +95,9 @@ config:
     blaze-rod-looting-level: "Blaze rod Looting level (0–5)"
     hunter-end-restriction-enabled: "Require runner End entry before hunters"
     runner-count: "Speedrunner count"
+    hunter-start-wait-seconds: "Hunter start wait (seconds)"
+    player-start-pos:
+      title: "Player start positions"
     allow-blaze-spawner-break: "Allow breaking blaze spawners"
     prevent-nether-portal-destruction: "Prevent portal destruction in the Nether"
     nether-coordinate-scale: "Nether coordinate scale"
@@ -186,3 +189,24 @@ tracking:
     not-found: "§f{target} §7| §cNot found in range §7| {dimension}"
     no-portal: "§f{target} §7| §cNo portal found in this dimension §7| {dimension}"
     runner-select-target: "§7Right-click to choose a tracking target"
+
+start-pos:
+  role:
+    hunter: "Hunters"
+    runner: "Speedrunners"
+  mode:
+    world-spawn: "World spawn"
+    player-spawn: "Player respawn point"
+    custom: "Custom positions"
+  add: "[+ Add a new position +]"
+  remove: "[Remove]"
+  duplicate: "This position is already in this world's list."
+  not-found: "No matching position exists in this world's list."
+  stale: "{prefix}§eThe configuration changed; use the refreshed controls."
+  usage: "Use /mhu config player-start-pos.<hunter|runner> <world-spawn|player-spawn|custom>, or .add-custom/.remove-custom <x> <y> <z>"
+  invalid-start: "{prefix}§cCannot start: {reason}"
+  empty-custom: "No custom start positions for {team}"
+  unavailable-world: "Start world is unavailable: {world}"
+  invalid-position: "Start position is outside the world's allowed coordinates: {world} ({x}, {y}, {z})"
+hunter-start:
+  countdown: "§eStart moving in: {seconds}"

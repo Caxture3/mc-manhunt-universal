@@ -16,10 +16,13 @@ import java.util.*;
 final class RegistryConfigCommands {
     private final ConfigurationRegistryService registry;
     private final LanguageService language;
+    private final StartPositionCommands starts;
     RegistryConfigCommands(ConfigurationRegistryService registry, LanguageService language) {
         this.registry = registry; this.language = language;
+        this.starts = new StartPositionCommands(registry,language);
     }
     void handle(CommandSender sender, String[] args) {
+        if(args.length>=2&&starts.handle(sender,args))return;
         if (args.length == 1) {
             language.send(sender, "config.header"); registry.list().forEach(snapshot -> show(sender, snapshot.key(), "")); return;
         }
@@ -46,6 +49,7 @@ final class RegistryConfigCommands {
         }
     }
     private void show(CommandSender sender, String key, String indentation) {
+        if(key.equals(com.caxture.manhuntuniversal.config.PlayerStartPositions.KEY)){starts.show(sender,null);return;}
         var snapshot = registry.find(key).orElse(null); if (snapshot == null) return;
         if (snapshot.effectiveValue() instanceof Map<?, ?> map) {
             Component heading = language.chatComponent(sender, "config.map-start", Map.of("key", name(sender,snapshot)));
@@ -95,7 +99,8 @@ final class RegistryConfigCommands {
     }
     List<String> complete(String[] args) {
         String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);
-        if (args.length == 2) return registry.keys().stream().filter(key -> key.startsWith(prefix)).toList();
+        if (args.length == 2) return java.util.stream.Stream.concat(registry.keys().stream(),starts.complete(args).stream()).distinct().filter(key -> key.startsWith(prefix)).toList();
+        var special=starts.complete(args);if(!special.isEmpty())return special;
         return args.length >= 3 ? registry.complete(args[1].toLowerCase(Locale.ROOT), prefix) : List.of();
     }
     private static String locale(CommandSender sender) { return sender instanceof Player player ? player.locale().toLanguageTag() : "zh_cn"; }
