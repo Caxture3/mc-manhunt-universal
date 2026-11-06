@@ -14,6 +14,7 @@ import java.util.*;
 
 /** Specialized editing/view over the same atomic, lockable startup configuration root. */
 final class StartPositionCommands {
+    static final String TITLE_LANGUAGE_KEY = "config.name.player-start-pos.title";
     private final ConfigurationRegistryService registry;private final LanguageService language;
     StartPositionCommands(ConfigurationRegistryService registry,LanguageService language){this.registry=registry;this.language=language;}
     static boolean owns(String key){return key.equals(PlayerStartPositions.KEY)||key.startsWith(PlayerStartPositions.KEY+".");}
@@ -45,7 +46,7 @@ final class StartPositionCommands {
     void show(CommandSender sender,String onlyRole){
         var root=registry.find(PlayerStartPositions.KEY).orElseThrow();
         var config=PlayerStartPositions.fromMap((Map<?,?>)root.nextMatchValue());
-        send(sender,"title",language.chatComponent(sender,"config.map-start",Map.of("key",language.text(sender,"config.description.player-start-pos.title")))
+        send(sender,"title",language.chatComponent(sender,"config.map-start",Map.of("key",language.text(sender,TITLE_LANGUAGE_KEY)))
                 .hoverEvent(Component.text(PlayerStartPositions.KEY)));
         for(String role:List.of("hunter","runner")){
             if(onlyRole!=null&&!onlyRole.equals(role))continue;

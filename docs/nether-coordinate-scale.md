@@ -20,4 +20,4 @@ nether-coordinate-scale: 8
 
 该配置在 API 中为 `ConfigTiming.IMMEDIATE`，支持现有配置查询、锁定、覆盖及注销恢复；修改的是全局当前值，不加入对局冻结配置，所以旧续局快照无需迁移。公开 SDK 仍为1.2.0，插件/Fabric仍为1.0.0，协议3，无需修改客户端。
 
-内置语言新增 `config.description.nether-coordinate-scale`：中文“下界坐标对应倍率”，英文“Nether coordinate scale”。使用服务器外部语言文件时可手动补入此键；插件不会自动改写已有语言文件。
+内置语言新增 `config.name.nether-coordinate-scale`：中文“下界坐标对应倍率”，英文“Nether coordinate scale”。使用服务器外部语言文件时可手动补入此键；插件不会自动改写已有语言文件。

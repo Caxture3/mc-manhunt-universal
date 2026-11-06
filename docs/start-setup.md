@@ -59,4 +59,4 @@ player-start-pos:
 
 续局快照新增冻结的开局设置、每人目标及等待锚点。旧快照按等待0秒、原有世界出生点规则补齐新冻结键；只有缺少整组新数据的旧格式会获得这些默认值，缺失部分新字段仍作为非法快照处理并保留文件。原角色、淘汰、重置债务及离线暂停时轴继续沿用。
 
-新内置文本位于 `config.description.hunter-start-wait-seconds`、`config.description.player-start-pos.title`、`start-pos.*` 和 `hunter-start.countdown`。已有外部语言文件不自动改写，可对照仓库双语资源手动补入。
+新内置文本位于 `config.name.hunter-start-wait-seconds`、`config.name.player-start-pos.title`、`start-pos.*` 和 `hunter-start.countdown`。已有外部语言文件不自动改写，可对照仓库双语资源手动补入。
