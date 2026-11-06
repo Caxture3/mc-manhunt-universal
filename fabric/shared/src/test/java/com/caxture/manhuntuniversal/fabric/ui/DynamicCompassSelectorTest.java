@@ -32,4 +32,31 @@ class DynamicCompassSelectorTest {
         assertFalse(state.enabled(timed,1_000_000_000L)); assertTrue(state.enabled(timed,2_000_000_000L));
         assertFalse(state.enabled(task,2_000_000_000L)); assertEquals(0,state.remaining(timed,2_000_000_000L));
     }
+
+    @Test void primaryClickSelectsDynamicTargetsAndSecondaryClickDoesNot() {
+        var state = new SelectorPageState(3, Optional.empty(),
+                List.of(option("core:village", 0), option("test:extension", 0)), 0);
+        var canvas = new SelectorRect(0, 0, 100, 60);
+        int primary = Integer.parseInt(System.getProperty("selector.primaryMouseButton"));
+        int secondary = primary + 1;
+        assertEquals("core:village", CompassSelectorInteraction.selectionAt(
+                state, canvas, 10, 30, primary, 0).orElseThrow().id());
+        assertEquals("test:extension", CompassSelectorInteraction.selectionAt(
+                state, canvas, 75, 30, primary, 0).orElseThrow().id());
+        assertTrue(CompassSelectorInteraction.selectionAt(state, canvas, 75, 30, secondary, 0).isEmpty());
+        assertTrue(CompassSelectorInteraction.selectionAt(state, canvas, 100, 30, primary, 0).isEmpty());
+    }
+
+    @Test void primaryClickCannotSelectLockedTargetsButCanAfterTimedUnlock() {
+        var timed = option("test:timed", 1500);
+        var task = new TrackingTargetDescriptor("test:task", "Task", "", "", 0, "generic", 0,
+                Optional.empty(), Optional.empty(), 0, false, "task");
+        var state = new SelectorPageState(3, Optional.empty(), List.of(task, timed), 0);
+        var canvas = new SelectorRect(0, 0, 100, 60);
+        int primary = Integer.parseInt(System.getProperty("selector.primaryMouseButton"));
+        assertTrue(CompassSelectorInteraction.selectionAt(state, canvas, 75, 30, primary, 0).isEmpty());
+        assertEquals("test:timed", CompassSelectorInteraction.selectionAt(
+                state, canvas, 75, 30, primary, 1_500_000_000L).orElseThrow().id());
+        assertTrue(CompassSelectorInteraction.selectionAt(state, canvas, 25, 30, primary, 1_500_000_000L).isEmpty());
+    }
 }

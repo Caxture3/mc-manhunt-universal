@@ -13,6 +13,7 @@ import java.util.*;
 public final class HunterStartWaitService {
     private final JavaPlugin plugin;private final GameManager games;private final PlayerStartService starts;private final PendingPlayerState pending;
     private final CountdownBlindnessService blindness;private final MatchPresentation presentation;private final Clock clock;private final Runnable released,failure;
+    private final HunterStartCountdownDisplay countdownDisplay=new HunterStartCountdownDisplay();
     private final Set<UUID> affected=new HashSet<>();private BukkitTask ticker;private boolean active,internalTeleport;private int ticks;
     public HunterStartWaitService(JavaPlugin plugin,GameManager games,PlayerStartService starts,PendingPlayerState pending,CountdownBlindnessService blindness,
                                   MatchPresentation presentation,Clock clock,Runnable released,Runnable failure){
@@ -29,6 +30,7 @@ public final class HunterStartWaitService {
     public void sync(){
         for(UUID id:List.copyOf(affected))if(!held(id))release(id,true);
         var game=games.activeSession().orElse(null);if(game==null)return;long seconds=HunterStartWaitPolicy.remaining(game,starts.waitSeconds(game),Instant.now(clock));
+        boolean refreshCountdown=countdownDisplay.update(seconds);
         for(Player player:plugin.getServer().getOnlinePlayers()){
             UUID id=player.getUniqueId();if(!held(id)||player.isDead())continue;
             if(starts.anchor(id)==null)starts.anchor(id,player.getLocation());
@@ -38,7 +40,8 @@ public final class HunterStartWaitService {
                 try{if(!player.teleport(fixed,PlayerTeleportEvent.TeleportCause.PLUGIN))throw new IllegalStateException("Cannot restore hunter waiting position");}finally{internalTeleport=false;}
             }
             player.setVelocity(new Vector());player.setFallDistance(0);
-            if(first||ticks%20==0){blindness.apply(player);presentation.showHunterStartCountdown(player,seconds);}
+            if(first||ticks%20==0)blindness.apply(player);
+            if(first||refreshCountdown)presentation.showHunterStartCountdown(player,seconds);
         }
         ticks++;
     }
@@ -47,5 +50,5 @@ public final class HunterStartWaitService {
         if(affected.remove(id)){Player player=plugin.getServer().getPlayer(id);if(player!=null&&player.isOnline()){blindness.restore(player);presentation.clearHunterStartCountdown(player);}}
         if(removeAnchor)starts.removeAnchor(id);
     }
-    public void stop(boolean removeAnchors){if(ticker!=null){ticker.cancel();ticker=null;}active=false;for(UUID id:List.copyOf(affected))release(id,removeAnchors);ticks=0;}
+    public void stop(boolean removeAnchors){if(ticker!=null){ticker.cancel();ticker=null;}active=false;for(UUID id:List.copyOf(affected))release(id,removeAnchors);ticks=0;countdownDisplay.reset();}
 }

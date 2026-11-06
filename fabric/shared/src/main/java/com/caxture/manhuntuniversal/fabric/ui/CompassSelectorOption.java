@@ -32,6 +32,10 @@ public enum CompassSelectorOption {
         return "randomanhunt.tracking_selector.option." + target.name().toLowerCase(Locale.ROOT);
     }
 
+    public SelectorTargetLabels labels() {
+        return SelectorTargetLabels.resolve("core:" + target.name().toLowerCase(Locale.ROOT), "", "");
+    }
+
     public int englishLines() {
         return englishLines;
     }

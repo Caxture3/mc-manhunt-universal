@@ -14,6 +14,19 @@ public final class CompassSelectorInteraction {
     private CompassSelectorInteraction() {
     }
 
+    public static boolean isPrimaryButton(int mouseButton) {
+        return mouseButton == PRIMARY_MOUSE_BUTTON;
+    }
+
+    public static Optional<com.caxture.manhuntuniversal.protocol.TrackingTargetDescriptor> selectionAt(
+            SelectorPageState state, SelectorRect canvas, int mouseX, int mouseY,
+            int mouseButton, long now) {
+        if (!isPrimaryButton(mouseButton)) return Optional.empty();
+        return state.hit(canvas, mouseX, mouseY).stream()
+                .mapToObj(index -> state.options().get(index))
+                .filter(option -> state.enabled(option, now)).findFirst();
+    }
+
     public static Optional<TrackingSelectionTarget> selectionAt(
             CompassSelectorLayout layout,
             int mouseX,
@@ -28,7 +41,7 @@ public final class CompassSelectorInteraction {
             TrackingSelectionTarget currentSelection, TrackingAvailability availability) {
         Objects.requireNonNull(layout, "layout");
         Objects.requireNonNull(currentSelection, "currentSelection");
-        if (mouseButton != PRIMARY_MOUSE_BUTTON) {
+        if (!isPrimaryButton(mouseButton)) {
             return Optional.empty();
         }
         return layout.panelAt(mouseX, mouseY)

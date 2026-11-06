@@ -45,11 +45,12 @@ public final class DynamicTrackingSelectionScreen extends Screen {
                         (2560-cropWidth)/2,0,panel.width(),panel.height(),cropWidth,1440,2560,1440,color);
             } else graphics.fill(panel.x(),panel.y(),panel.x()+panel.width(),panel.y()+panel.height(),
                     ((Math.round(opacity*255)&255)<<24)|(option.color()&0xffffff));
-            int mainScale=fit(layout.typography().chineseScale(),option.name(),panel.width()-8);
-            int englishScale=fit(layout.typography().englishScale(),option.secondaryName(),panel.width()-8);
+            var labels=SelectorTargetLabels.resolve(option.id(),option.name(),option.secondaryName());
+            int mainScale=fit(layout.typography().chineseScale(),labels.primary(),panel.width()-8);
+            int englishScale=fit(layout.typography().englishScale(),labels.secondary(),panel.width()-8);
             int y=panel.y()+Math.round(panel.height()*0.67f);
-            text(graphics,option.name(),panel.x()+panel.width()/2f,y,mainScale,color,panel.width()-8);
-            text(graphics,option.secondaryName(),panel.x()+panel.width()/2f,y+font.lineHeight*mainScale+4,englishScale,color,panel.width()-8);
+            text(graphics,labels.primary(),panel.x()+panel.width()/2f,y,mainScale,color,panel.width()-8);
+            text(graphics,labels.secondary(),panel.x()+panel.width()/2f,y+font.lineHeight*mainScale+4,englishScale,color,panel.width()-8);
             if (!option.description().isBlank()) text(graphics,option.description(),panel.x()+panel.width()/2f,
                     panel.y()+panel.height()*0.88f,1,color,panel.width()-8);
             option.itemIcon().flatMap(id->BuiltInRegistries.ITEM.getOptional(Identifier.parse(id))).ifPresent(item->
@@ -68,13 +69,14 @@ public final class DynamicTrackingSelectionScreen extends Screen {
         if (state.pages()>1) text(graphics,"◀   "+(state.page()+1)+" / "+state.pages()+"   ▶",width/2f,height-22,1,0xffffffff,width-8);
     }
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.button()==0 && state.pages()>1 && event.y()>=height-28 && event.y()<height) {
+        if (CompassSelectorInteraction.isPrimaryButton(event.button()) && state.pages()>1 && event.y()>=height-28 && event.y()<height) {
             if (event.x()<width/2d) state.previous(); else state.next(); return true;
         }
-        var layout=CompassSelectorLayout.fit(Math.max(1,width),Math.max(1,height)); var hit=state.hit(layout.canvas(),(int)Math.floor(event.x()),(int)Math.floor(event.y()));
-        if (event.button()==0 && hit.isPresent()) {
-            var option=state.options().get(hit.getAsInt());
-            if (!state.enabled(option,System.nanoTime())) return true;
+        var layout=CompassSelectorLayout.fit(Math.max(1,width),Math.max(1,height));
+        var selection=CompassSelectorInteraction.selectionAt(state,layout.canvas(),
+                (int)Math.floor(event.x()),(int)Math.floor(event.y()),event.button(),System.nanoTime());
+        if (selection.isPresent()) {
+            var option=selection.orElseThrow();
             completed=true; choice.accept(option.id(),state.revision());
             minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK,1f)); onClose(); return true;
         }

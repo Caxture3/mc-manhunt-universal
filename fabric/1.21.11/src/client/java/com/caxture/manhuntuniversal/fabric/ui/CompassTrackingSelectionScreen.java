@@ -143,28 +143,20 @@ public final class CompassTrackingSelectionScreen extends Screen {
                 2560, 1440, textureColor);
 
         SelectorTypography typography = layout.typography();
-        String baseKey = option.translationBaseKey();
-        Component chinese = Component.translatable(baseKey + ".zh");
+        SelectorTargetLabels labels = option.labels();
+        Component chinese = Component.literal(labels.primary());
         int chineseScale = fittingScale(
                 typography.chineseScale(), chinese, panel.width() - 8);
         int chineseY = panel.y() + Math.round(panel.height() * 0.67F);
         renderCenteredText(graphics, chinese, panel.x() + panel.width() / 2.0F,
                 chineseY, chineseScale, textColor);
 
-        int englishScale = typography.englishScale();
-        Component[] english = new Component[option.englishLines()];
-        for (int line = 0; line < english.length; line++) {
-            english[line] = Component.translatable(baseKey + ".en." + (line + 1));
-            englishScale = Math.min(englishScale,
-                    fittingScale(englishScale, english[line], panel.width() - 8));
-        }
+        Component english = Component.literal(labels.secondary());
+        int englishScale = fittingScale(typography.englishScale(), english, panel.width() - 8);
         int gap = Math.max(3, panel.height() / 120);
         int englishY = chineseY + font.lineHeight * chineseScale + gap;
-        for (int line = 0; line < english.length; line++) {
-            renderCenteredText(graphics, english[line], panel.x() + panel.width() / 2.0F,
-                    englishY + line * font.lineHeight * englishScale,
-                    englishScale, textColor);
-        }
+        renderCenteredText(graphics, english, panel.x() + panel.width() / 2.0F,
+                englishY, englishScale, textColor);
         if (remainingMillis > 0) {
             int countdownScale = englishScale * 2;
             renderCenteredText(graphics, Component.literal(CountdownText.format(remainingMillis)),
