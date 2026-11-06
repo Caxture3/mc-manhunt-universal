@@ -203,7 +203,7 @@ start-pos:
   duplicate: "此世界的列表中已存在相同位置。"
   not-found: "此世界的列表中没有对应位置。"
   stale: "{prefix}§e配置已发生变化，请使用刷新后的按钮。"
-  usage: "用法：/mhu config player-start-pos.<hunter|runner> <world-spawn|player-spawn|custom>，或 .add-custom/.remove-custom <x> <y> <z>"
+  usage: "用法：/mhu config player-start-pos.<hunter|runner> <world-spawn|player-spawn|custom>，或 .add-custom/.remove-custom <x> <y> <z> [<yaw> <pitch>] [<world>]（默认方向 0 0，世界 overworld）"
   invalid-start: "{prefix}§c无法开局：{reason}"
   empty-custom: "{team}未设置自定义开局位置"
   unavailable-world: "开局位置所在世界不可用：{world}"

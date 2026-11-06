@@ -9,6 +9,7 @@ public final class StartupCheckpointMigration {
         if(!hasStartup&&!saved.containsKey(wait)&&!saved.containsKey(PlayerStartPositions.KEY)){
             result.put(wait,0);result.put(PlayerStartPositions.KEY,PlayerStartPositions.defaults().toMap());
         }
+        result.computeIfPresent(PlayerStartPositions.KEY,(key,value)->PlayerStartPositions.type().validate(value));
         return Map.copyOf(result);
     }
 }

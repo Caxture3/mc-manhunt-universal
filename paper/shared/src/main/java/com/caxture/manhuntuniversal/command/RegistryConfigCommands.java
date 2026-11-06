@@ -97,10 +97,10 @@ final class RegistryConfigCommands {
         }
         return line.hoverEvent(HoverEvent.showText(tooltip)).clickEvent(action);
     }
-    List<String> complete(String[] args) {
+    List<String> complete(CommandSender sender,String[] args) {
         String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);
-        if (args.length == 2) return java.util.stream.Stream.concat(registry.keys().stream(),starts.complete(args).stream()).distinct().filter(key -> key.startsWith(prefix)).toList();
-        var special=starts.complete(args);if(!special.isEmpty())return special;
+        if (args.length == 2) return java.util.stream.Stream.concat(registry.keys().stream(),starts.complete(sender,args).stream()).distinct().filter(key -> key.startsWith(prefix)).toList();
+        var special=starts.complete(sender,args);if(!special.isEmpty())return special;
         return args.length >= 3 ? registry.complete(args[1].toLowerCase(Locale.ROOT), prefix) : List.of();
     }
     private static String locale(CommandSender sender) { return sender instanceof Player player ? player.locale().toLanguageTag() : "zh_cn"; }

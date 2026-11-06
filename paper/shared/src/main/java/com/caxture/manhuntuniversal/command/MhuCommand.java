@@ -330,7 +330,7 @@ public final class MhuCommand implements CommandExecutor, TabCompleter {
         boolean admin = CommandAccessPolicy.adminAllowed(sender.hasPermission(ADMIN_PERMISSION));
         if(args.length>=2&&args[0].equalsIgnoreCase("debug"))return debugCommands.tabComplete(sender,args);
         if (registryCommands != null && admin && args.length >= 2 && args[0].equalsIgnoreCase("config"))
-            return registryCommands.complete(args);
+            return registryCommands.complete(sender,args);
         List<String> candidates = new ArrayList<>();
         if (args.length == 1) {
             if (sender instanceof Player && !gameManager.teamSelections().forcedRandom()) candidates.add("join");

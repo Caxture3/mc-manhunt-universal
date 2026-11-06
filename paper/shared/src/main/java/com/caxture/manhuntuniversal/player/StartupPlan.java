@@ -13,7 +13,7 @@ public record StartupPlan(UUID sessionId,int waitSeconds,PlayerStartPositions po
             boolean hunter=session.roleOf(participant.id()).orElseThrow()==Role.HUNTER;var team=hunter?config.hunter():config.runner();int index=hunter?hunters++:runners++;
             StartDestination destination=switch(team.mode()){
                 case "world-spawn"->primary;case "player-spawn"->personal.apply(participant.id());
-                case "custom"->{if(team.custom().isEmpty())throw new IllegalArgumentException("No custom start positions for "+(hunter?"hunter":"runner"));yield new StartDestination(team.custom().get(index%team.custom().size()),0,0);}
+                case "custom"->{if(team.custom().isEmpty())throw new IllegalArgumentException("No custom start positions for "+(hunter?"hunter":"runner"));var point=team.custom().get(index%team.custom().size());yield new StartDestination(point,point.yaw(),point.pitch());}
                 default->throw new IllegalArgumentException("Invalid mode");};targets.put(participant.id(),destination);
         }
         return new StartupPlan(session.id(),wait,config,targets,Map.of());

@@ -7,7 +7,6 @@ import com.caxture.manhuntuniversal.i18n.LanguageService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.event.ClickEvent;
-import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import java.util.*;
@@ -27,14 +26,14 @@ final class StartPositionCommands {
             if(path.length==1){if(args.length==2)show(sender,path[0]);else if(args.length==3)change(sender,key+".mode",args[2]);else throw new IllegalArgumentException(language.text(sender,"start-pos.usage"));return true;}
             if(path.length!=2||!List.of("add-custom","remove-custom").contains(path[1]))return false;
             if(!allowed(sender))return true;
-            if(args.length!=5)throw new IllegalArgumentException(language.text(sender,"start-pos.usage"));
-            World world=sender instanceof Player player?player.getWorld():sender.getServer().getWorlds().getFirst();
-            var point=new StartPosition(world.getUID(),world.getName(),Double.parseDouble(args[2]),Double.parseDouble(args[3]),Double.parseDouble(args[4]));
+            if(args.length<5||args.length>8)throw new IllegalArgumentException(language.text(sender,"start-pos.usage"));
+            var point=StartPositionArguments.parse(sender.getServer(),Arrays.copyOfRange(args,2,args.length));
             String listKey=PlayerStartPositions.KEY+"."+path[0]+".custom";var snapshot=registry.find(listKey).orElseThrow();
             var points=points(snapshot.savedValue());
             if(path[1].equals("add-custom")){if(points.stream().anyMatch(value->value.sameCoordinates(point)))throw new IllegalArgumentException(language.text(sender,"start-pos.duplicate"));points.add(point);}
             else if(!points.removeIf(value->value.sameCoordinates(point)))throw new IllegalArgumentException(language.text(sender,"start-pos.not-found"));
             update(sender,listKey,points.stream().map(StartPosition::toMap).toList());return true;
+        }catch(StartPositionArguments.UnknownWorld error){language.send(sender,"config.invalid",Map.of("reason",language.text(sender,"start-pos.unavailable-world",Map.of("world",error.world))));return true;
         }catch(RuntimeException error){language.send(sender,"config.invalid",Map.of("reason",Objects.toString(error.getMessage(),"Invalid start position")));return true;}
     }
     private boolean allowed(CommandSender sender){if(sender.hasPermission(MhuCommand.ADMIN_PERMISSION))return true;language.send(sender,"command.no-permission");return false;}
@@ -69,19 +68,22 @@ final class StartPositionCommands {
                         var entries=points(current.savedValue());if(!entries.removeIf(value->value.sameCoordinates(point))){show(clicked,null);return;}
                         update(clicked,base+".custom",entries.stream().map(StartPosition::toMap).toList());
                     }));}
-                    send(sender,base+".point",Component.text("            ("+point.x()+", "+point.y()+", "+point.z()+") ",NamedTextColor.GRAY).append(remove)
+                    send(sender,base+".point",Component.text("            "+StartPositionArguments.describe(sender.getServer(),point)+" ",NamedTextColor.GRAY).append(remove)
                             .hoverEvent(Component.text(point.worldName()+" ("+point.worldId()+")")));
                 }
                 Component add=language.component(sender,"start-pos.add",Map.of()).color(NamedTextColor.GREEN);
-                if(sender instanceof Player)add=add.clickEvent(ClickEvent.suggestCommand("/mhu config "+base+".add-custom "));
+                if(sender instanceof Player player)add=add.clickEvent(ClickEvent.suggestCommand(StartPositionArguments.suggestion(sender.getServer(),role,player.getLocation())));
                 send(sender,base+".add",Component.text("            ").append(add));send(sender,base+".close",Component.text("        }",NamedTextColor.GRAY));
             }
             if(metadata.lockedBy().isPresent())send(sender,base+".locked",language.component(sender,"config.locked-detail",Map.of("owner",metadata.lockedBy().get(),"reason",metadata.lockReason().orElse(""))));
         }
-        send(sender,"end",Component.text("}",NamedTextColor.GRAY).append(language.component(sender,"config.next-match",Map.of())));
+        send(sender,"end",Component.text("}",NamedTextColor.GRAY));
     }
     private void send(CommandSender sender,String id,Component line){language.sendComponent(sender,"core:config.player-start-pos."+id,line);}
     private static List<StartPosition> points(Object raw){List<StartPosition> result=new ArrayList<>();for(Object value:(List<?>)raw)result.add(StartPosition.fromMap((Map<?,?>)value));return result;}
-    List<String> complete(String[] args){String prefix=args[args.length-1].toLowerCase(Locale.ROOT);if(args.length==2){List<String> keys=new ArrayList<>();for(String role:List.of("hunter","runner")){String base=PlayerStartPositions.KEY+"."+role;keys.add(base);keys.add(base+".add-custom");keys.add(base+".remove-custom");}return keys.stream().filter(value->value.startsWith(prefix)).toList();}
+    List<String> complete(CommandSender sender,String[] args){String prefix=args[args.length-1].toLowerCase(Locale.ROOT);if(args.length==2){List<String> keys=new ArrayList<>();for(String role:List.of("hunter","runner")){String base=PlayerStartPositions.KEY+"."+role;keys.add(base);keys.add(base+".add-custom");keys.add(base+".remove-custom");}return keys.stream().filter(value->value.startsWith(prefix)).toList();}
+        if(owns(args[1])&&(args[1].endsWith(".add-custom")||args[1].endsWith(".remove-custom"))){
+            List<String> values=new ArrayList<>();if(args.length==6||args.length==8)values.addAll(StartPositionArguments.worlds(sender.getServer()));if(args.length==6||args.length==7)values.add("0");
+            return values.stream().filter(value->value.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();}
         return args.length==3&&List.of(PlayerStartPositions.KEY+".hunter",PlayerStartPositions.KEY+".runner").contains(args[1])?PlayerStartPositions.MODES.stream().filter(value->value.startsWith(prefix)).toList():List.of();}
 }

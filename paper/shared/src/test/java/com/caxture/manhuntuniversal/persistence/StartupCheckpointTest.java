@@ -10,6 +10,15 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class StartupCheckpointTest {
     @TempDir Path directory;
+    @Test void legacyFrozenCustomPositionsNormalizeRotationBeforeResumeValidation(){
+        var oldPoint=Map.<String,Object>of("world",UUID.randomUUID().toString(),"world-name","world","x",1.0,"y",70.0,"z",2.0);
+        var positions=Map.<String,Object>of("hunter",Map.of("mode","custom","custom",List.of(oldPoint)),"runner",Map.of("mode","world-spawn","custom",List.of()));
+        var saved=Map.<String,Object>of("hunter-start-wait-seconds",30,"player-start-pos",positions);
+        var migrated=StartupCheckpointMigration.frozen(saved,true);
+        var normalized=(Map<?,?>)migrated.get("player-start-pos");var hunter=(Map<?,?>)normalized.get("hunter");var point=(Map<?,?>)((List<?>)hunter.get("custom")).getFirst();
+        assertEquals(0.0,point.get("yaw"));assertEquals(0.0,point.get("pitch"));assertFalse(oldPoint.containsKey("yaw"));
+        assertEquals(PlayerStartPositions.fromMap(positions).toMap(),normalized);
+    }
     @Test void startupDestinationsAndAnchorsSurvivePauseWithoutReassignment()throws Exception{
         UUID a=UUID.randomUUID(),b=UUID.randomUUID(),world=UUID.randomUUID();var games=new GameManager(new RoleAssigner(new Random(1)));games.teamSelections().choose(a,TeamPreference.RUNNER,1);
         var game=games.start(List.of(new Participant(a,"A"),new Participant(b,"B")),new MatchSettings(1,true,new TrackingSettingsSnapshot(512,30,4096)),Instant.EPOCH).session().orElseThrow();games.activate(game.id(),Instant.EPOCH);

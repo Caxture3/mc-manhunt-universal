@@ -42,12 +42,16 @@ player-start-pos:
 /mhu config player-start-pos.hunter custom
 /mhu config player-start-pos.runner player-spawn
 /mhu config player-start-pos.hunter.add-custom 535 15 235
-/mhu config player-start-pos.hunter.remove-custom 535 15 235
+/mhu config player-start-pos.hunter.add-custom -31 87 -12 180 0 overworld
+/mhu config player-start-pos.runner.add-custom 100 70 200 the_nether
+/mhu config player-start-pos.hunter.remove-custom -31 87 -12 overworld
 ```
 
-坐标接受有限的绝对小数，不支持 `~`。添加时保存执行玩家所在世界的 UUID/名称；控制台使用主世界。移除命令匹配执行者对应世界和 XYZ；聊天按钮则精确匹配该条记录，不要求执行者身处记录所在世界。同一世界内重复的完全相同 XYZ 被拒绝，世界名称变化不影响 UUID 匹配。
+添加、移除的参数为 `<x> <y> <z> [<yaw> <pitch>] [<world>]`。坐标和方向接受有限绝对数值，不支持 `~`。方向按水平朝向yaw、俯仰pitch排序，单位为度；省略时默认 `0 0`。世界省略时默认 `overworld`，与执行者当前世界无关；也可只在XYZ后填写世界。支持 `overworld`、`the_nether`（或 `nether`）、`the_end`（或 `end`）、对应的 `minecraft:` 名称，以及已加载世界名或UUID。三个维度别名分别选择服务器中第一个相应类型的世界；额外同类型世界使用其独立名称或UUID。
 
-`/mhu config` 和位置查询展示两队可点击的模式、绿色选中标记、自定义坐标及移除按钮；悬停坐标显示世界信息。`[+ 添加新位置 +]` 预填相应的 `/mhu config player-start-pos.hunter.add-custom ` 或 `runner.add-custom `，保留末尾空格。模式和移除操作会重新检查管理权限及配置锁；过期移除按钮不会误删新记录，而是提示并刷新列表。
+位置记录保存世界UUID/名称、XYZ及yaw/pitch，真实世界始终按UUID匹配。移除命令按对应世界和XYZ匹配，朝向不改变位置身份；聊天按钮精确匹配该条记录，不要求执行者身处记录所在世界。同一世界内重复的完全相同XYZ被拒绝，即使朝向不同；不同世界的相同坐标允许共存。已有不含方向的配置记录按 `0 0` 兼容。
+
+`/mhu config` 和位置查询展示两队可点击的模式、绿色选中标记及位置列表，例如 `(overworld: -31.0, 87.0, -12.0; 180.0°, 0.0°) [移除]`，悬停显示世界名称及UUID。`[+ 添加新位置 +]` 预填对应队伍的添加命令，带上生成配置消息时玩家的完整XYZ、yaw/pitch和世界。原版聊天建议随消息固定，移动后重新查询可刷新按钮中的数据；多个同类型世界和含空格的世界名不会被错误映射成主世界。模式和移除操作会重新检查管理权限及配置锁；过期移除按钮不会误删新记录，而是提示并刷新列表。位置列表末尾不再显示“下一局生效……”提示，配置仍按原规则在下局冻结生效。
 
 开局按固定参与者 UUID 顺序在各队内分配位置，第 N 名使用 `(N-1) % 位置数量` 对应项；人数多时循环，人数少时忽略剩余位置，不随机。进入倒计时时固定每人的实际目标；期间离线也保留其名额和目标，后续补偿重置使用同一目标。
 
@@ -55,8 +59,10 @@ player-start-pos:
 
 ## 扩展与兼容
 
-公开 API 配置注册中两项均为 `NEXT_MATCH`，使用已有锁定、覆盖和原子保存入口。`player-start-pos` 是完整映射根，角色下含 `mode` 和 `custom` 叶项；自定义条目为包含 `world`（UUID字符串）、`world-name`、`x/y/z` 的映射。无新 Fabric 协议或附加客户端模组，产品1.0.0、SDK1.2.0、协议3保持不变。
+公开 API 配置注册中两项均为 `NEXT_MATCH`，使用已有锁定、覆盖和原子保存入口。`player-start-pos` 是完整映射根，角色下含 `mode` 和 `custom` 叶项；自定义条目为包含 `world`（UUID字符串）、`world-name`、`x/y/z`、`yaw/pitch` 的映射，旧条目缺少整组yaw/pitch时补0。无新 Fabric 协议或附加客户端模组，产品1.0.0、SDK1.2.0、协议3保持不变。
 
 续局快照新增冻结的开局设置、每人目标及等待锚点。旧快照按等待0秒、原有世界出生点规则补齐新冻结键；只有缺少整组新数据的旧格式会获得这些默认值，缺失部分新字段仍作为非法快照处理并保留文件。原角色、淘汰、重置债务及离线暂停时轴继续沿用。
 
 新内置文本位于 `config.name.hunter-start-wait-seconds`、`config.name.player-start-pos.title`、`start-pos.*` 和 `hunter-start.countdown`。已有外部语言文件不自动改写，可对照仓库双语资源手动补入。
+
+本次调整了内置 `start-pos.usage` 的命令用法；若服务器外部语言文件已有此键，可手动同步其中可选方向与世界的说明。

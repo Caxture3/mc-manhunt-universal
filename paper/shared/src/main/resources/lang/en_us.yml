@@ -203,7 +203,7 @@ start-pos:
   duplicate: "This position is already in this world's list."
   not-found: "No matching position exists in this world's list."
   stale: "{prefix}§eThe configuration changed; use the refreshed controls."
-  usage: "Use /mhu config player-start-pos.<hunter|runner> <world-spawn|player-spawn|custom>, or .add-custom/.remove-custom <x> <y> <z>"
+  usage: "Use /mhu config player-start-pos.<hunter|runner> <world-spawn|player-spawn|custom>, or .add-custom/.remove-custom <x> <y> <z> [<yaw> <pitch>] [<world>] (defaults: 0 0, overworld)"
   invalid-start: "{prefix}§cCannot start: {reason}"
   empty-custom: "No custom start positions for {team}"
   unavailable-world: "Start world is unavailable: {world}"
