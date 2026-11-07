@@ -52,11 +52,18 @@ game:
     plugin-disabled: "{prefix}§eThe plugin was disabled and the game was stopped."
   result:
     hidden-report: "{prefix}§6Winner: {winner}§6 - {reason}"
+    hidden-report-no-reason: "{prefix}§6Winner: {winner}"
     runners-title: "§cSpeedrunners Win"
     hunters-title: "§bHunters Win"
     full-report: |-
       {prefix}§6════ Game Result ════
       §6Winner: {winner}§6 - {reason}{killer-section}
+
+      §cSpeedrunners§6: §f{runners}
+      §bHunters§6: §f{hunters}
+    full-report-no-reason: |-
+      {prefix}§6════ Game Result ════
+      §6Winner: {winner}{killer-section}
 
       §cSpeedrunners§6: §f{runners}
       §bHunters§6: §f{hunters}
@@ -133,7 +140,7 @@ restriction:
   hunter-end-locked: "{prefix}§cA living speedrunner must enter the End before hunters can insert Eyes of Ender or enter the End."
   blaze-spawner-break-denied: "{prefix}§cBlaze spawners cannot be broken."
 reason:
-  extension-finished: "Extension match result"
+  extension-finished: ""
   runner-died: "All speedrunners eliminated"
   dragon-defeated: "Ender Dragon defeated"
   dragon-absent: "No Ender Dragon in the target End"
@@ -165,7 +172,7 @@ tracking:
     lore-runner-use: "§7Hold to view the target; right-click to choose."
     lore-hunter-use: "§7Hold to track the nearest speedrunner."
     lore-bound: "§cGame item: cannot be dropped or stored in containers"
-    lore-extension: "§7Tracking is managed by a game extension."
+    lore-extension: ""
     no-space: "{prefix}§cFree an inventory slot to receive your tracking compass."
   dialog:
     locked-tooltip: "§7Unlocks in {time}; selection is currently disabled"

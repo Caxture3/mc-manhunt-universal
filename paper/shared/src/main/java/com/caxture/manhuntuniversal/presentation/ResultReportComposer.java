@@ -4,6 +4,7 @@ import com.caxture.manhuntuniversal.game.GameResult;
 import com.caxture.manhuntuniversal.game.GameResultReason;
 import com.caxture.manhuntuniversal.game.GameWinner;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -16,22 +17,22 @@ final class ResultReportComposer {
     }
 
     static Report compose(GameResult result, Localizer localizer, Function<UUID, String> nameLookup, boolean hideRoles) {
-        if (hideRoles) {
-            return new Report("game.result.hidden-report", Map.of(
-                    "winner", localizer.text(winnerKey(result.winner()), Map.of()),
-                    "reason", reasonText(result, localizer)));
+        String reason = reasonText(result, localizer);
+        Map<String, String> placeholders = new LinkedHashMap<>();
+        placeholders.put("winner", localizer.text(winnerKey(result.winner()), Map.of()));
+        if (!reason.isBlank()) {
+            placeholders.put("reason", reason);
         }
-        String killerSection = result.killer()
-                .map(killer -> localizer.text("game.result.killer-section", Map.of(
-                        "player", nameLookup.apply(killer))))
-                .orElse("");
-
-        return new Report("game.result.full-report", Map.of(
-                "winner", localizer.text(winnerKey(result.winner()), Map.of()),
-                "reason", reasonText(result, localizer),
-                "runners", MatchTextFormatter.names(result.participants(), result.runners()),
-                "hunters", MatchTextFormatter.names(result.participants(), result.hunters()),
-                "killer-section", killerSection));
+        if (!hideRoles) {
+            String killerSection = result.killer()
+                    .map(killer -> localizer.text("game.result.killer-section", Map.of("player", nameLookup.apply(killer))))
+                    .orElse("");
+            placeholders.put("runners", MatchTextFormatter.names(result.participants(), result.runners()));
+            placeholders.put("hunters", MatchTextFormatter.names(result.participants(), result.hunters()));
+            placeholders.put("killer-section", killerSection);
+        }
+        String template = hideRoles ? "game.result.hidden-report" : "game.result.full-report";
+        return new Report(reason.isBlank() ? template + "-no-reason" : template, placeholders);
     }
 
     private static String winnerKey(GameWinner winner) {
@@ -48,7 +49,7 @@ final class ResultReportComposer {
     }
 
     private static String reasonText(GameResult result, Localizer localizer) {
-        return result.reason() == GameResultReason.CUSTOM && !result.customReason().isBlank()
+        return result.reason() == GameResultReason.CUSTOM
                 ? result.customReason() : localizer.text(resultReasonKey(result.reason()), Map.of());
     }
 

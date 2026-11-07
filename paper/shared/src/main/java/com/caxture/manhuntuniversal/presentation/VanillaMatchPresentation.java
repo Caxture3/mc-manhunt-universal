@@ -109,7 +109,8 @@ public final class VanillaMatchPresentation implements MatchPresentation {
                 : com.caxture.manhuntuniversal.api.TeamRole.HUNTER, false)));
         var snapshot = new com.caxture.manhuntuniversal.api.ResultSnapshot(result.sessionId(),
                 com.caxture.manhuntuniversal.api.MatchWinner.valueOf(result.winner().name()),
-                result.customReason().isBlank() ? result.reason().name() : result.customReason(),
+                result.reason() == com.caxture.manhuntuniversal.game.GameResultReason.CUSTOM
+                        ? result.customReason() : result.reason().name(),
                 match.flatMap(com.caxture.manhuntuniversal.api.MatchSnapshot::startedAt), result.settledAt(),
                 match.map(com.caxture.manhuntuniversal.api.MatchSnapshot::participants).orElse(participants), result.killer());
         language.withResult(snapshot, () -> showResultContent(result));

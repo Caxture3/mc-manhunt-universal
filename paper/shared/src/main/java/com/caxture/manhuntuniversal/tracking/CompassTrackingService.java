@@ -1002,11 +1002,11 @@ public final class CompassTrackingService {
         }
         var names = languages.item(player, "core:compass.name", false, List.of(languages.component(player, "tracking.compass.name", Map.of())));
         meta.itemName(names.isEmpty() ? Component.empty() : names.getFirst());
-        meta.lore(languages.item(player, "core:compass.lore", true, List.of(
-                languages.component(player, extensions!=null&&extensions.overridden(player.getUniqueId())?"tracking.compass.lore-extension":kind == TrackingCompassKind.RUNNER
-                        ? "tracking.compass.lore-runner-use"
-                        : "tracking.compass.lore-hunter-use", Map.of()),
-                languages.component(player, "tracking.compass.lore-bound", Map.of()))));
+        boolean controlled = extensions != null && extensions.overridden(player.getUniqueId());
+        List<Component> lore = kind.loreKeys(controlled).stream()
+                .map(key -> languages.component(player, key, Map.of()))
+                .toList();
+        meta.lore(languages.item(player, "core:compass.lore", true, lore));
         meta.setEnchantmentGlintOverride(true);
         compass.setItemMeta(meta);
     }

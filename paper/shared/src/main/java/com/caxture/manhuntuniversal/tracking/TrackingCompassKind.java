@@ -2,6 +2,7 @@ package com.caxture.manhuntuniversal.tracking;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.List;
 
 public enum TrackingCompassKind {
     RUNNER("runner"),
@@ -15,6 +16,14 @@ public enum TrackingCompassKind {
 
     public String id() {
         return id;
+    }
+
+    List<String> loreKeys(boolean controlled) {
+        if (controlled) {
+            return List.of("tracking.compass.lore-bound");
+        }
+        String instruction = this == RUNNER ? "tracking.compass.lore-runner-use" : "tracking.compass.lore-hunter-use";
+        return List.of(instruction, "tracking.compass.lore-bound");
     }
 
     public static Optional<TrackingCompassKind> fromId(String id) {
